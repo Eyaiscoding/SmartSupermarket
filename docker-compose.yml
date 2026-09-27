@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  # -- Mosquitto MQTT Broker ---------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: b2g-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: unless-stopped
+
+  # -- TimescaleDB (PostgreSQL + Timescale extension) --------------------------
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: b2g-timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: b2g
+      POSTGRES_USER: b2g
+      POSTGRES_PASSWORD: b2g_password
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # -- Redis -------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: b2g-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # -- FastAPI Backend ---------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: b2g-backend
+    ports:
+      - "8000:8000"
+    environment:
+      B2G_INGESTION_MODE: csv
+      MQTT_BROKER_HOST: mosquitto
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: "5432"
+      TIMESCALE_DB: b2g
+      TIMESCALE_USER: b2g
+      TIMESCALE_PASSWORD: b2g_password
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      - mosquitto
+      - timescaledb
+      - redis
+    restart: unless-stopped
+
+volumes:
+  timescale_data:
