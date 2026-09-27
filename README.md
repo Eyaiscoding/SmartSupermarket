@@ -4,9 +4,25 @@ A Building-to-Grid (B2G) backend simulation engine for a smart supermarket conne
 
 ---
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Dataset](#dataset)
+- [Version 2 -- Production Upgrade](#version-2----production-upgrade)
+- [Target Architecture (Future Work)](#target-architecture-future-work)
+- [Tools & Tech Stack](#tools--tech-stack)
+- [Setup & Run Instructions](#setup--run-instructions)
+- [API Endpoints](#api-endpoints)
+- [Output Contract](#output-contract)
+- [Project Structure](#project-structure)
+- [Papers & Sources Used](#papers--sources-used)
+- [Team & Scope](#team--scope)
+
+---
+
 ## Architecture
 
-![B2G Architecture](b2g_microservices_architecture.png)
+![B2G Six-Layer Pipeline](b2g_general_architecture.png)
 
 The simulation engine is organized into six clearly separated layers, each implemented as its own Python module under `src/`:
 
@@ -35,190 +51,20 @@ Tags each appliance group with a criticality tier (Tier 1: refrigeration, Tier 2
 
 ### 6. Visualization & API Layer (`src/api/`)
 
-Exposes the per-timestep simulation output as a clean, documented JSON and CSV stream matching the output contract (see below). This layer does not implement a frontend -- it produces the data that a separate dashboard (built by another team) will consume.
+Exposes the per-timestep simulation output as a clean, documented JSON and CSV stream matching the output contract (see below). In v2, this layer also serves a FastAPI application with REST and WebSocket endpoints. It does not implement a frontend -- it produces the data that a separate dashboard (built by another team) will consume.
 
 ---
 
 ## Dataset
 
-**File:** `data/dataset.csv` (also at repo root as `dataset.csv`)
+**File:** `data/dataset.csv`
 
 - **Type:** Synthetic, generated for this simulation
 - **Resolution:** 15-minute intervals
 - **Period:** 1 June -- 30 September 2025 (4 months)
 - **Size:** 11,712 rows, 30 columns (~2 MB)
 
-### Schema
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `timestamp` | datetime | ISO timestamp at 15-min intervals |
-| `occupancy` | int | Number of people in the building |
-| `temperature` | float | Indoor temperature (C) |
-| `humidity` | float | Relative humidity (%) |
-| `solar_irradiance` | float | Solar irradiance (W/m2) |
-| `pv_voltage` | float | PV array voltage (V) |
-| `pv_current` | float | PV array current (A) |
-| `pv_power` | float | PV generation (kW) |
-| `total_consumption` | float | Total building consumption (kW) |
-| `display_freezer_power` | float | Display freezer consumption (kW) |
-| `display_refrigerator_power` | float | Display refrigerator consumption (kW) |
-| `cold_room_power` | float | Cold room consumption (kW) |
-| `freezer_room_power` | float | Freezer room consumption (kW) |
-| `hvac_power` | float | HVAC consumption (kW) |
-| `lighting_power` | float | Lighting consumption (kW) |
-| `checkout_power` | float | Checkout system consumption (kW) |
-| `it_power` | float | IT infrastructure consumption (kW) |
-| `other_appliance_power` | float | Other appliances consumption (kW) |
-| `battery_voltage` | float | Battery voltage (V) |
-| `battery_current` | float | Battery current (A) |
-| `battery_capacity` | float | Battery capacity (kWh) |
-| `battery_soc` | float | Battery state of charge (%) |
-| `battery_power` | float | Battery power (kW); positive = discharge, negative = charge |
-| `grid_power` | float | Grid power (kW); positive = import, negative = export |
-| `energy_price` | float | Energy price (EUR/kWh) |
-| `demand_response` | int | Demand response event active (0 or 1) |
-| `p2p_energy` | float | Peer-to-peer energy exchange (kW) |
-| `forecast_consumption` | float | Dataset's own consumption forecast (kW) |
-| `forecast_pv` | float | Dataset's own PV forecast (kW) |
-| `anomaly_score` | float | Dataset's own anomaly score |
-
-### Sign Conventions
-
-- `battery_power`: positive = discharge, negative = charge
-- `grid_power`: positive = import, negative = export
-
-### Energy Balance Identity
-
-At every timestamp, this should approximately hold:
-
-```
-pv_power + grid_import + battery_discharge + p2p_import
-    ~ total_consumption + battery_charge + grid_export + p2p_export
-```
-
----
-
-## Papers & Sources Used
-
-| # | Paper / Source | Year | Design Decision Justified |
-|---|---------------|------|---------------------------|
-| 1 | *Building to Grid* -- Guidehouse | 2019 | Overall B2G concept and the building-as-grid-asset framing that motivates the entire pipeline architecture |
-| 2 | *Emerging Microgrid Business Models* -- Navigant | 2016 | P2P energy trading model and the microgrid interconnection topology used in the DERMS dispatch layer |
-| 3 | *Microgrids -- Critical Facilities* -- Navigant | 2019 | The criticality-tier hierarchy (Tier 1 = never shed) and the reliability-first design constraint |
-| 4 | *Buildings-to-Grid Technical Opportunities: From the Grid Perspective* -- DOE/NREL/PNNL | 2014 | The specific grid services modelled (peak shaving, valley filling, demand response) and their value quantification approach |
-| 5 | *A Comprehensive Review of Building-to-Grid Interaction* -- Energy Use | 2026 | The six-layer pipeline decomposition and the coverage-ratio metric as the primary reliability indicator |
-| 6 | *Buildings-to-Grid Integration Framework* -- IEEE Transactions on Smart Grid (Taha et al.) | 2017 | The simplified receding-horizon MPC formulation and the multi-objective cost function structure (import cost + shedding penalty + comfort penalty) |
-| 7 | *Thermal storage capacity in the entire building stock of Denmark for energy flexibility strategies and building-to-grid services* -- REHVA European HVAC Journal | 2024 | The peak shaving / load shifting / valley filling action set, and the HVAC thermal-inertia flexibility budget derived from comfort-band margin |
-| 8 | *Data-Driven Analytics for Reliability in the Buildings-to-Grid Integrated System Framework* -- IEEE Access (Bachoumis et al.) | 2023 | The anomaly-detection approach (Isolation Forest) and the data-driven compliance verification methodology |
-
----
-
-## Tools & Tech Stack
-
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Python | 3.13.5 | Core runtime |
-| pandas | >= 2.0 | Data loading, manipulation, and CSV output |
-| NumPy | >= 1.24 | Numerical operations |
-| scikit-learn | >= 1.3 | Gradient boosting forecaster, Isolation Forest anomaly detector |
-| pytest | >= 7.4 | Unit and integration testing |
-
----
-
-## Setup & Run Instructions
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/<your-username>/SmartSupermarket.git
-cd SmartSupermarket
-```
-
-### 2. Create a virtual environment (recommended)
-
-```bash
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-```
-
-### 3. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Run the full pipeline
-
-```bash
-# Normal run (no stress scenarios)
-python scenario_runner.py
-
-# Run with all stress scenarios
-python scenario_runner.py --scenario all
-
-# Run a specific stress scenario
-python scenario_runner.py --scenario price_spike
-python scenario_runner.py --scenario forced_grid_outage
-python scenario_runner.py --scenario sensor_corruption
-```
-
-Output files are written to the `output/` directory as JSON and CSV.
-
-### 5. Run the test suite
-
-```bash
-python -m pytest tests/ -v
-```
-
----
-
-## Output Contract
-
-Each timestep produces one JSON record with the following fields:
-
-```json
-{
-  "timestamp": "2025-06-01 00:00:00",
-  "coverage_ratio": 0.94,
-  "coverage_status": "AT_RISK",
-  "active_actions": ["hvac_soft_shed"],
-  "tier_1_protected": true,
-  "battery_soc": 62.3,
-  "grid_power": 12.4,
-  "p2p_energy": 0,
-  "anomaly_flag": false,
-  "anomaly_source": null
-}
-```
-
-### Field Descriptions
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `timestamp` | string | ISO datetime of this 15-minute interval |
-| `coverage_ratio` | float | Ratio of available supply to total consumption (0.0 -- 1.0) |
-| `coverage_status` | string | `"NORMAL"` (>= 0.95), `"AT_RISK"` (0.90 -- 0.95), or `"CRITICAL"` (< 0.90) |
-| `active_actions` | list[string] | Currently active MPC actions: `"peak_shaving"`, `"hvac_soft_shed"`, `"valley_filling"`, `"hard_shedding"` |
-| `tier_1_protected` | bool | Whether Tier 1 loads (refrigeration) were fully supplied this step |
-| `battery_soc` | float | Battery state of charge after this step (%) |
-| `grid_power` | float | Grid power for this step (kW; positive = import) |
-| `p2p_energy` | float | P2P energy exchange for this step (kW) |
-| `anomaly_flag` | bool | Whether the anomaly detector flagged this timestep |
-| `anomaly_source` | string or null | If anomaly_flag is true, the feature most likely responsible |
-
-The full output is written to both `output/output_<scenario>.json` (array of records) and `output/output_<scenario>.csv` (flat CSV).
-
-In v2, the same records are also accessible via the FastAPI REST endpoints and persisted to TimescaleDB for durable historical queries.
-
----
-
-## Team & Scope
-
-This repository covers the **backend simulation engine only**. The dashboard and compliance reporting layers are built separately by other team members and consume this module's output contract (the JSON/CSV files and the REST/WebSocket API described above). The API layer in this repo produces the data; it does not render any frontend UI.
+The full 30-column schema, sign conventions, and energy balance identity are documented in [`docs/DATASET.md`](docs/DATASET.md).
 
 ---
 
@@ -248,16 +94,6 @@ The ingestion layer supports two modes via the `B2G_INGESTION_MODE` environment 
 
 - **`csv`** (default): Reads `dataset.csv` directly. This is what the 36+ unit tests and `scenario_runner.py` use, so they stay fast, deterministic, and runnable without Docker.
 - **`mqtt`**: Subscribes to the `supermarket/telemetry` MQTT topic on a Mosquitto broker. A companion publisher script (`src/ingestion/mqtt_publisher.py`) replays the dataset row by row, simulating a live edge sensor feed. This is the "live demo" mode used when the full Docker stack is running.
-
-### API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check (reports infrastructure connectivity) |
-| GET | `/api/v1/latest` | Latest pipeline state (reads Redis, falls back to TimescaleDB) |
-| GET | `/api/v1/history?start=...&end=...` | Historical records by time range (TimescaleDB) |
-| POST | `/api/v1/scenario` | Trigger a scenario replay (body: `{"scenario": "none"}`) |
-| WS | `/ws/stream` | WebSocket: stream per-timestep output live during a pipeline run |
 
 ---
 
@@ -307,7 +143,7 @@ The current v2 architecture (single FastAPI app with real MQTT, TimescaleDB, and
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/SmartSupermarket.git
+git clone https://github.com/Eyaiscoding/SmartSupermarket.git
 cd SmartSupermarket
 
 # Start all services (Mosquitto, TimescaleDB, Redis, FastAPI backend)
@@ -321,7 +157,7 @@ docker compose up --build
 
 ```bash
 # Clone and set up virtual environment
-git clone https://github.com/<your-username>/SmartSupermarket.git
+git clone https://github.com/Eyaiscoding/SmartSupermarket.git
 cd SmartSupermarket
 python -m venv venv
 venv\Scripts\activate        # Windows
@@ -353,6 +189,54 @@ python -m src.ingestion.mqtt_publisher --interval 0.1
 
 ---
 
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check (reports infrastructure connectivity) |
+| GET | `/api/v1/latest` | Latest pipeline state (reads Redis, falls back to TimescaleDB) |
+| GET | `/api/v1/history?start=...&end=...` | Historical records by time range (TimescaleDB) |
+| POST | `/api/v1/scenario` | Trigger a scenario replay (body: `{"scenario": "none"}`) |
+| WS | `/ws/stream` | WebSocket: stream per-timestep output live during a pipeline run |
+
+---
+
+## Output Contract
+
+Each timestep produces one JSON record with the following fields:
+
+```json
+{
+  "timestamp": "2025-06-01 00:00:00",
+  "coverage_ratio": 0.94,
+  "coverage_status": "AT_RISK",
+  "active_actions": ["hvac_soft_shed"],
+  "tier_1_protected": true,
+  "battery_soc": 62.3,
+  "grid_power": 12.4,
+  "p2p_energy": 0,
+  "anomaly_flag": false,
+  "anomaly_source": null
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | string | ISO datetime of this 15-minute interval |
+| `coverage_ratio` | float | Ratio of available supply to total consumption (0.0 -- 1.0) |
+| `coverage_status` | string | `"NORMAL"` (>= 0.95), `"AT_RISK"` (0.90 -- 0.95), or `"CRITICAL"` (< 0.90) |
+| `active_actions` | list[string] | Currently active MPC actions: `"peak_shaving"`, `"hvac_soft_shed"`, `"valley_filling"`, `"hard_shedding"` |
+| `tier_1_protected` | bool | Whether Tier 1 loads (refrigeration) were fully supplied this step |
+| `battery_soc` | float | Battery state of charge after this step (%) |
+| `grid_power` | float | Grid power for this step (kW; positive = import) |
+| `p2p_energy` | float | P2P energy exchange for this step (kW) |
+| `anomaly_flag` | bool | Whether the anomaly detector flagged this timestep |
+| `anomaly_source` | string or null | If anomaly_flag is true, the feature most likely responsible |
+
+The full output is written to both `output/output_<scenario>.json` (array of records) and `output/output_<scenario>.csv` (flat CSV). In v2, the same records are also accessible via the FastAPI REST endpoints and persisted to TimescaleDB for durable historical queries.
+
+---
+
 ## Project Structure
 
 ```
@@ -361,7 +245,9 @@ SmartSupermarket/
 |   |-- workflows/
 |       |-- ci.yml                  # GitHub Actions CI workflow
 |-- data/
-|   |-- dataset.csv                 # Synthetic dataset (also at repo root)
+|   |-- dataset.csv                 # Synthetic dataset
+|-- docs/
+|   |-- DATASET.md                  # Full 30-column schema reference
 |-- docker/
 |   |-- mosquitto/
 |       |-- mosquitto.conf          # Mosquitto broker config
@@ -410,7 +296,28 @@ SmartSupermarket/
 |-- docker-compose.yml              # Full stack orchestration
 |-- requirements.txt
 |-- .gitignore
+|-- b2g_general_architecture.png    # Six-layer pipeline diagram
 |-- b2g_microservices_architecture.png  # Target architecture diagram
 |-- README.md
 ```
 
+---
+
+## Papers & Sources Used
+
+| # | Paper / Source | Year | Design Decision Justified |
+|---|---------------|------|---------------------------|
+| 1 | *Building to Grid* -- Guidehouse | 2019 | Overall B2G concept and the building-as-grid-asset framing that motivates the entire pipeline architecture |
+| 2 | *Emerging Microgrid Business Models* -- Navigant | 2016 | P2P energy trading model and the microgrid interconnection topology used in the DERMS dispatch layer |
+| 3 | *Microgrids -- Critical Facilities* -- Navigant | 2019 | The criticality-tier hierarchy (Tier 1 = never shed) and the reliability-first design constraint |
+| 4 | *Buildings-to-Grid Technical Opportunities: From the Grid Perspective* -- DOE/NREL/PNNL | 2014 | The specific grid services modelled (peak shaving, valley filling, demand response) and their value quantification approach |
+| 5 | *A Comprehensive Review of Building-to-Grid Interaction* -- Energy Use | 2026 | The six-layer pipeline decomposition and the coverage-ratio metric as the primary reliability indicator |
+| 6 | *Buildings-to-Grid Integration Framework* -- IEEE Transactions on Smart Grid (Taha et al.) | 2017 | The simplified receding-horizon MPC formulation and the multi-objective cost function structure (import cost + shedding penalty + comfort penalty) |
+| 7 | *Thermal storage capacity in the entire building stock of Denmark for energy flexibility strategies and building-to-grid services* -- REHVA European HVAC Journal | 2024 | The peak shaving / load shifting / valley filling action set, and the HVAC thermal-inertia flexibility budget derived from comfort-band margin |
+| 8 | *Data-Driven Analytics for Reliability in the Buildings-to-Grid Integrated System Framework* -- IEEE Access (Bachoumis et al.) | 2023 | The anomaly-detection approach (Isolation Forest) and the data-driven compliance verification methodology |
+
+---
+
+## Team & Scope
+
+This repository covers the **backend simulation engine only**. The dashboard and compliance reporting layers are built separately by other team members and consume this module's output contract (the JSON/CSV files and the REST/WebSocket API described above). The API layer in this repo produces the data; it does not render any frontend UI.
