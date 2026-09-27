@@ -6,7 +6,7 @@ A Building-to-Grid (B2G) backend simulation engine for a smart supermarket conne
 
 ## Architecture
 
-![B2G General Architecture](b2g_general_architecture.png)
+![B2G Architecture](b2g_microservices_architecture.png)
 
 The simulation engine is organized into six clearly separated layers, each implemented as its own Python module under `src/`:
 
