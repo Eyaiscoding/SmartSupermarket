@@ -212,11 +212,144 @@ Each timestep produces one JSON record with the following fields:
 
 The full output is written to both `output/output_<scenario>.json` (array of records) and `output/output_<scenario>.csv` (flat CSV).
 
+In v2, the same records are also accessible via the FastAPI REST endpoints and persisted to TimescaleDB for durable historical queries.
+
 ---
 
 ## Team & Scope
 
-This repository covers the **backend simulation engine only**. The dashboard and compliance reporting layers are built separately by other team members and consume this module's output contract (the JSON/CSV files described above). The API layer in this repo produces the data; it does not render any frontend UI.
+This repository covers the **backend simulation engine only**. The dashboard and compliance reporting layers are built separately by other team members and consume this module's output contract (the JSON/CSV files and the REST/WebSocket API described above). The API layer in this repo produces the data; it does not render any frontend UI.
+
+---
+
+## Version 2 -- Production Upgrade
+
+### What Changed
+
+Version 2 wraps the existing six-layer pipeline in production infrastructure:
+
+| Component | v1 (CSV-only) | v2 (Production) |
+|-----------|---------------|-----------------|
+| **API** | Flat JSON/CSV files | FastAPI with REST + WebSocket endpoints |
+| **Persistence** | In-memory + CSV dump | TimescaleDB hypertable for durable time-series storage |
+| **Cache** | None | Redis for low-latency latest-state reads |
+| **Ingestion** | Direct CSV file read | Dual-mode: CSV (tests/determinism) or MQTT (live demo) |
+| **Message Broker** | None | Mosquitto MQTT broker for edge telemetry simulation |
+| **Deployment** | `python scenario_runner.py` | `docker compose up` (full stack) |
+| **CI/CD** | None | GitHub Actions: pytest + ruff lint + Docker build |
+
+### Why
+
+The goal is to earn full production-engineering credit (real API, real DB, real cache, real CI/CD, real message broker) without betting the demo on a distributed system none of us have operated before. The six pipeline modules stay as clearly separated internal packages inside one FastAPI app -- these are exactly the seams a future Kafka-based microservices split would cut along.
+
+### Dual-Mode Ingestion Design
+
+The ingestion layer supports two modes via the `B2G_INGESTION_MODE` environment variable:
+
+- **`csv`** (default): Reads `dataset.csv` directly. This is what the 36+ unit tests and `scenario_runner.py` use, so they stay fast, deterministic, and runnable without Docker.
+- **`mqtt`**: Subscribes to the `supermarket/telemetry` MQTT topic on a Mosquitto broker. A companion publisher script (`src/ingestion/mqtt_publisher.py`) replays the dataset row by row, simulating a live edge sensor feed. This is the "live demo" mode used when the full Docker stack is running.
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check (reports infrastructure connectivity) |
+| GET | `/api/v1/latest` | Latest pipeline state (reads Redis, falls back to TimescaleDB) |
+| GET | `/api/v1/history?start=...&end=...` | Historical records by time range (TimescaleDB) |
+| POST | `/api/v1/scenario` | Trigger a scenario replay (body: `{"scenario": "none"}`) |
+| WS | `/ws/stream` | WebSocket: stream per-timestep output live during a pipeline run |
+
+---
+
+## Target Architecture (Future Work)
+
+![B2G Microservices Architecture](b2g_microservices_architecture.png)
+
+The diagram above shows the intended production target architecture: MQTT edge ingestion, a Kafka event streaming backbone, four independent microservices (forecasting, MPC, DERMS, compliance), TimescaleDB + Redis, a FastAPI API gateway, and a dashboard client.
+
+**This full Kafka/multi-service split is documented here as the intended next step but is deliberately not implemented for this project's scope.** This is a conscious scoping decision, not a technical limitation. The main reasons:
+
+1. **Operational risk**: No team member has operated a Kafka cluster in production before. Introducing a distributed event streaming platform alongside the energy management logic would add significant operational complexity without proportional benefit at our current scale.
+2. **Remaining time**: With a fixed deadline, we prioritised getting the core simulation pipeline correct and well-tested over distributed infrastructure.
+3. **Clear upgrade path**: The six internal modules are already cleanly separated along the exact boundaries a Kafka split would use. When the team is ready, each module can be extracted into its own service with Kafka topics replacing the current in-process function calls.
+
+The current v2 architecture (single FastAPI app with real MQTT, TimescaleDB, and Redis) is the pragmatic middle ground that demonstrates all the production-engineering patterns without the operational risk of premature distribution.
+
+---
+
+## Tools & Tech Stack
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Python | 3.13 | Core runtime |
+| pandas | >= 2.0 | Data loading, manipulation, and CSV output |
+| NumPy | >= 1.24 | Numerical operations |
+| scikit-learn | >= 1.3 | Gradient boosting forecaster, Isolation Forest anomaly detector |
+| FastAPI | >= 0.110 | REST API and WebSocket endpoints |
+| Pydantic | >= 2.0 | Request/response model validation (output contract enforcement) |
+| uvicorn | >= 0.27 | ASGI server for FastAPI |
+| paho-mqtt | >= 2.0 | MQTT client for dual-mode ingestion |
+| Mosquitto | 2.x | MQTT broker (Docker service) |
+| SQLAlchemy | >= 2.0 | ORM for TimescaleDB persistence |
+| psycopg2 | >= 2.9 | PostgreSQL driver |
+| TimescaleDB | latest (PG 16) | Time-series database for durable historical storage |
+| Redis | 7.x | Low-latency cache for latest pipeline state |
+| Docker / docker-compose | latest | Container orchestration for the full stack |
+| GitHub Actions | -- | CI: test, lint (ruff), Docker build on every push/PR |
+| pytest | >= 7.4 | Unit and integration testing |
+| ruff | >= 0.4 | Fast Python linter |
+
+---
+
+## Setup & Run Instructions
+
+### Option A: Docker (Full Stack -- Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/<your-username>/SmartSupermarket.git
+cd SmartSupermarket
+
+# Start all services (Mosquitto, TimescaleDB, Redis, FastAPI backend)
+docker compose up --build
+
+# The API is now available at http://localhost:8000
+# API docs at http://localhost:8000/docs
+```
+
+### Option B: Local Development (No Docker)
+
+```bash
+# Clone and set up virtual environment
+git clone https://github.com/<your-username>/SmartSupermarket.git
+cd SmartSupermarket
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS/Linux
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the original scenario runner (CSV mode, no infra needed)
+python scenario_runner.py
+python scenario_runner.py --scenario all
+
+# Run the FastAPI server (CSV mode, degrades gracefully without DB/Redis)
+uvicorn src.api.fastapi_app:app --reload
+
+# Run tests
+python -m pytest tests/ -v
+```
+
+### Option C: MQTT Live Demo (with Docker stack running)
+
+```bash
+# In one terminal: start the full stack
+docker compose up
+
+# In another terminal: replay dataset over MQTT
+python -m src.ingestion.mqtt_publisher --interval 0.1
+```
 
 ---
 
@@ -224,30 +357,45 @@ This repository covers the **backend simulation engine only**. The dashboard and
 
 ```
 SmartSupermarket/
+|-- .github/
+|   |-- workflows/
+|       |-- ci.yml                  # GitHub Actions CI workflow
 |-- data/
-|   |-- dataset.csv              # Synthetic dataset (also at repo root)
+|   |-- dataset.csv                 # Synthetic dataset (also at repo root)
+|-- docker/
+|   |-- mosquitto/
+|       |-- mosquitto.conf          # Mosquitto broker config
 |-- src/
 |   |-- __init__.py
-|   |-- ingestion/               # Layer 1: Data ingestion
+|   |-- config.py                   # Centralised settings (env vars)
+|   |-- ingestion/                  # Layer 1: Data ingestion
 |   |   |-- __init__.py
-|   |   |-- loader.py
-|   |-- forecasting/             # Layer 2: AI forecasting & flexibility
+|   |   |-- loader.py               # CSV loader & validator
+|   |   |-- mqtt_publisher.py       # MQTT dataset replay publisher
+|   |   |-- mqtt_subscriber.py      # MQTT subscriber (live mode)
+|   |-- forecasting/                # Layer 2: AI forecasting & flexibility
 |   |   |-- __init__.py
 |   |   |-- forecaster.py
 |   |   |-- anomaly.py
 |   |   |-- flexibility.py
-|   |-- mpc/                     # Layer 3: MPC coordination core
+|   |-- mpc/                        # Layer 3: MPC coordination core
 |   |   |-- __init__.py
 |   |   |-- coordinator.py
-|   |-- derms/                   # Layer 4: DERMS dispatch
+|   |-- derms/                      # Layer 4: DERMS dispatch
 |   |   |-- __init__.py
 |   |   |-- dispatch.py
-|   |-- compliance/              # Layer 5: Reliability & compliance
+|   |-- compliance/                 # Layer 5: Reliability & compliance
 |   |   |-- __init__.py
 |   |   |-- checker.py
-|   |-- api/                     # Layer 6: Visualization & API output
+|   |-- api/                        # Layer 6: API & output
+|   |   |-- __init__.py
+|   |   |-- output.py               # v1 JSON/CSV writer
+|   |   |-- models.py               # Pydantic models (output contract)
+|   |   |-- fastapi_app.py          # FastAPI application
+|   |-- persistence/                # Persistence layer (v2)
 |       |-- __init__.py
-|       |-- output.py
+|       |-- timescale.py            # TimescaleDB ORM & hypertable
+|       |-- redis_cache.py          # Redis latest-state cache
 |-- tests/
 |   |-- test_ingestion.py
 |   |-- test_forecasting.py
@@ -255,9 +403,14 @@ SmartSupermarket/
 |   |-- test_derms.py
 |   |-- test_compliance.py
 |   |-- test_api.py
-|-- scenario_runner.py           # Main pipeline entry point
+|   |-- test_fastapi.py             # FastAPI endpoint tests (v2)
+|   |-- test_persistence.py         # DB round-trip & Redis tests (v2)
+|-- scenario_runner.py              # Original pipeline entry point
+|-- Dockerfile                      # Backend container image
+|-- docker-compose.yml              # Full stack orchestration
 |-- requirements.txt
 |-- .gitignore
-|-- b2g_general_architecture.png
+|-- b2g_microservices_architecture.png  # Target architecture diagram
 |-- README.md
 ```
+
