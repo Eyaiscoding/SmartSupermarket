@@ -1,0 +1,61 @@
+/* Single source of truth for the dark-only palette and its softer intensity. */
+:root,
+.app {
+  color-scheme: dark;
+  --bg: #050505;
+  --surface: #0e0e10;
+  --surface-2: #151518;
+  --border: #26262b;
+  --text: #f4f4f0;
+  --text-muted: #8e8e96;
+  --yellow: #e4ff1a;
+  --yellow-soft: #b8cc00;
+  --orange: #ff9f1a;
+  --fuchsia: #ff2bd6;
+  --fuchsia-soft: #b81e98;
+  --ok: #3dff9a;
+  --warn: #ffb020;
+  --danger: #ff3b5c;
+  --p2p-color: color-mix(in srgb, var(--fuchsia) 48%, var(--yellow-soft));
+  --price-color: color-mix(in srgb, var(--fuchsia) 68%, var(--text));
+  --grid-line: rgb(255 255 255 / 7%);
+  --top-edge: color-mix(in srgb, var(--text) 14%, var(--border));
+  --hover-border: color-mix(in srgb, var(--yellow) 32%, var(--border));
+  --number-glow: 0 0 12px color-mix(in srgb, currentColor 15%, transparent);
+  --line-glow: drop-shadow(0 0 4px color-mix(in srgb, var(--yellow) 22%, transparent));
+  --dot-glow: 0 0 8px color-mix(in srgb, currentColor 35%, transparent);
+  --anomaly-glow: drop-shadow(0 0 4px color-mix(in srgb, var(--fuchsia) 35%, transparent));
+  --font-body: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  /* Existing component aliases keep presentation separate from application logic. */
+  --card: var(--surface);
+  --line: var(--border);
+  --muted: var(--text-muted);
+  --accent: var(--yellow);
+  --hover: var(--surface-2);
+}
+
+.app[data-intensity='soft'] {
+  --yellow: #d4e600;
+  --fuchsia: #e02bc0;
+  --number-glow: none;
+  --line-glow: none;
+  --dot-glow: none;
+  --anomaly-glow: none;
+}
+
+/* Tailwind v4 tokens reference the same variables rather than duplicating colours. */
+@theme inline {
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-2);
+  --color-foreground: var(--text);
+  --color-muted: var(--text-muted);
+  --color-electric: var(--yellow);
+  --color-sale: var(--fuchsia);
+  --color-success: var(--ok);
+  --color-warning: var(--warn);
+  --color-critical: var(--danger);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-display);
+}
