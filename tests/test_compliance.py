@@ -11,7 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.compliance.checker import (
+from src.compliance.checker import (  # noqa: E402
     APPLIANCE_TIER_MAP,
     REGULATORY_REFERENCES,
     ComplianceChecker,
@@ -19,7 +19,7 @@ from src.compliance.checker import (
     CriticalityTier,
     cold_chain_temps,
 )
-from src.mpc.coordinator import MPCAction
+from src.mpc.coordinator import MPCAction  # noqa: E402
 
 
 class TestCriticalityMapping:
