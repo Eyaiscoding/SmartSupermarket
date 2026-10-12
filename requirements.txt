@@ -11,6 +11,7 @@ websockets>=14.0,<17.0
 
 # Message broker (v2)
 paho-mqtt>=2.0
+kafka-python>=2.0.2
 
 # Persistence (v2)
 psycopg2-binary>=2.9
