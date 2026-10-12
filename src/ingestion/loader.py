@@ -9,6 +9,7 @@ layers to consume.
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
@@ -136,6 +137,32 @@ def load_dataset(
         Validated DataFrame with ``timestamp`` parsed as datetime, sorted
         chronologically, and with an ``index`` column (if present) dropped.
     """
+    # ── MQTT live ingestion mode ─────────────────────────────────────────
+    # When B2G_INGESTION_MODE=mqtt, subscribe to the broker, drain buffered
+    # telemetry, and return a DataFrame. This is the live/demo path that
+    # replaces CSV loading.
+    from src.config import settings
+    if settings.INGESTION_MODE == "mqtt":
+        from .mqtt_subscriber import MQTTSubscriber
+        subscriber = MQTTSubscriber(
+            host=settings.MQTT_BROKER_HOST,
+            port=settings.MQTT_BROKER_PORT,
+            topic=settings.MQTT_TOPIC,
+        )
+        subscriber.start()
+        time.sleep(2)  # Allow initial messages to arrive
+        df = subscriber.drain_as_dataframe()
+        subscriber.stop()
+        if df.empty:
+            raise ValueError(
+                "MQTT mode: No messages received. Is mqtt_publisher running?"
+            )
+        # The DataFrame from MQTT is already in the correct format
+        # Skip CSV-specific validation and return directly after basic cleanup
+        df = df.sort_values("timestamp").reset_index(drop=True) if "timestamp" in df.columns else df
+        return df
+
+    # ── CSV ingestion mode (default, backward-compatible) ────────────────
     if path is None:
         from src.p2p.config import enabled, supermarket_csv
         path = supermarket_csv() if enabled() or os.getenv("B2G_SUPERMARKET_CSV") else _find_dataset(project_root)
