@@ -312,3 +312,92 @@ Tested: 108/108 tests passing, Docker stack healthy
 *Last Updated*: WebSocket fix complete, ready for rebuild  
 *Changes*: requirements.txt, timescale.py, Dockerfile, docker-compose.yml  
 *Next Step*: Run `docker compose down && docker compose build --no-cache && docker compose up`
+
+
+---
+
+## UPDATE: Mosquitto Health Check Fix
+
+### Additional Issue Discovered
+
+After the initial WebSocket and API 503 fixes, a third issue was discovered during deployment:
+
+**Error:**
+```
+✘ Container b2g-mosquitto   Error dependency mosquitto failed to start
+dependency failed to start: container b2g-mosquitto is unhealthy
+```
+
+### Root Cause
+
+The original health check used `/dev/tcp/127.0.0.1/1883` which is a bash-specific feature not available in the Alpine Linux-based Mosquitto container:
+
+```yaml
+# BROKEN
+healthcheck:
+  test: ["CMD", "timeout", "5", "sh", "-c", "echo > /dev/tcp/127.0.0.1/1883"]
+```
+
+Alpine uses `ash` (not `bash`) and doesn't support `/dev/tcp/` pseudo-devices.
+
+### Solution
+
+Use Mosquitto's built-in `mosquitto_pub` command to verify the broker is accepting connections:
+
+```yaml
+# FIXED
+healthcheck:
+  test: ["CMD-SHELL", "mosquitto_pub -h localhost -t test -m test -q 1 || exit 1"]
+```
+
+This publishes a test message to verify:
+1. The broker is running
+2. It accepts connections on port 1883
+3. It can process MQTT publish commands
+
+### Verification
+
+```powershell
+docker compose up -d
+docker compose ps
+```
+
+**Result:**
+```
+NAME              STATUS
+b2g-backend       Up (healthy) ✅
+b2g-mosquitto     Up (healthy) ✅
+b2g-redis         Up (healthy) ✅
+b2g-timescaledb   Up (healthy) ✅
+```
+
+**API Test:**
+```powershell
+Invoke-WebRequest -Uri http://localhost:8000/health -UseBasicParsing
+```
+
+**Response:**
+```json
+{"status":"healthy","timescaledb":true,"redis":true}
+```
+
+### Commits
+
+- Initial fix: `75c5839` (WebSocket & API 503)
+- Mosquitto fix: `cbcbcf9` (Health check)
+
+Both pushed to `origin/main` ✅
+
+---
+
+## Final Status
+
+✅ All 3 issues resolved:
+1. WebSocket connection loss
+2. API 503 errors
+3. Mosquitto health check failure
+
+✅ All 4 Docker services healthy  
+✅ API operational  
+✅ WebSocket endpoint ready  
+✅ System production-ready
