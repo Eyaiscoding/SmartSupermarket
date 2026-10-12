@@ -1336,6 +1336,19 @@ footer svg {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+.temperature-monitor {
+  margin-top: 12px;
+  padding-top: 8px;
+}
+.temperature-monitor summary {
+  cursor: pointer;
+  font-size: 12px;
+  padding-block: 6px;
+}
+.temperature-monitor details p {
+  font-size: 12px;
+  line-height: 1.5;
+}
 @media (max-width: 360px) {
   .kpi-grid {
     grid-template-columns: 1fr;

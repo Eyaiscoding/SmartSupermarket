@@ -7,10 +7,17 @@ import {
   ShieldCheck,
   Zap,
 } from 'lucide-react';
-import type { TimestepRecord } from '../api/types';
-import { number } from '../lib/format';
+import { TEMPERATURE_SENSORS, type TimestepRecord, type TemperatureSensor } from '../api/types';
+import { number, dateTime } from '../lib/format';
 import { NeonGauge } from './NeonGauge';
 const statuses = { NORMAL: 'Normal', AT_RISK: 'À risque', CRITICAL: 'Critique' };
+const temperatureLabels: Record<TemperatureSensor, string> = {
+  display_freezer_temp: 'Vitrine surgelés',
+  freezer_room_temp: 'Chambre de congélation',
+  display_refrigerator_temp: 'Vitrine réfrigérée',
+  cold_room_temp: 'Chambre froide',
+};
+const temperatureStatuses = { OK: 'Dans la plage', WARNING: 'Avertissement', CRITICAL: 'Critique' };
 export function StatusCards({ record }: { record: TimestepRecord }) {
   return (
     <section className="kpi-grid" aria-label="État actuel">
@@ -43,8 +50,45 @@ export function StatusCards({ record }: { record: TimestepRecord }) {
         </div>
         <p>Réfrigération · priorité absolue</p>
         <span className="micro-label">
-          {record.tier1Protected ? 'Chaîne du froid préservée' : 'Intervention immédiate requise'}
+          {record.tier1Protected
+            ? 'Alimentation prioritaire protégée'
+            : 'Intervention immédiate requise'}
         </span>
+        <div aria-live="polite" className="temperature-monitor">
+          <p>
+            Températures ·{' '}
+            {record.temperatureStatus ? (
+              <span
+                className={`badge ${record.temperatureStatus === 'OK' ? 'NORMAL' : record.temperatureStatus === 'WARNING' ? 'AT_RISK' : 'CRITICAL'}`}
+              >
+                {temperatureStatuses[record.temperatureStatus]}
+              </span>
+            ) : (
+              'Mesures indisponibles'
+            )}
+          </p>
+          {record.temperatures && (
+            <details>
+              <summary>Voir les capteurs ({Object.keys(record.temperatures).length}/4)</summary>
+              {TEMPERATURE_SENSORS.map((sensor) => (
+                <p key={sensor}>
+                  {temperatureLabels[sensor]} :{' '}
+                  {record.temperatures?.[sensor] == null
+                    ? 'Indisponible'
+                    : `${number(record.temperatures[sensor])} °C`}
+                </p>
+              ))}
+              {record.temperatureAlerts?.map((alert) => (
+                <p key={alert.sensor}>
+                  {temperatureLabels[alert.sensor]} · {temperatureStatuses[alert.status]} depuis{' '}
+                  {dateTime(alert.since)}. Plage : {number(alert.limitLow)} à{' '}
+                  {number(alert.limitHigh)} °C.
+                </p>
+              ))}
+              <p>Seuils de simulation à valider.</p>
+            </details>
+          )}
+        </div>
       </article>
       <article className="card metric">
         <div className="card-label">

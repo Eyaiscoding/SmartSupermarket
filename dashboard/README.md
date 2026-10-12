@@ -104,6 +104,14 @@ Les légendes nomment les séries, les exports sont tracés en tirets et les pri
 
 ## Future work
 
+Le suivi des températures est affiché à côté du Tier 1 : état global, mesures des
+quatre capteurs, plages configurées et début des alertes. Une protection électrique
+ne garantit pas une température correcte. Les capteurs absents sont indiqués
+« Indisponible » ; le mode mock actuel ne simule pas ces mesures.
+Pour les données réelles, configurer côté backend
+`B2G_SUPERMARKET_CSV=data1/dataset_modified.csv`. Les seuils sont des paramètres
+de simulation à valider, documentés dans `../docs/DATASET.md`.
+
 - La logique de trading de niveau 3 (MPC décidant de vendre) **ne fait pas partie de ce dashboard**. Il observe les échanges décidés par le backend.
 - Exposer les vrais tarifs, le sens de règlement P2P et le fuseau de simulation dans le contrat.
 - Unifier le lancement POST et la diffusion WebSocket côté backend ; ajouter identifiants de run, progression, reprise et annulation côté serveur.

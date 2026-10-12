@@ -13,6 +13,39 @@ const raw = {
   anomaly_source: null,
 };
 describe('backend adapter', () => {
+  it('preserves temperature alerts independently of Tier 1', () => {
+    const record = adaptRecord({
+      ...raw,
+      temperatures: { cold_room_temp: 9 },
+      temperature_status: 'CRITICAL',
+      temperature_alerts: [
+        {
+          sensor: 'cold_room_temp',
+          value: 9,
+          status: 'CRITICAL',
+          limit_low: 0,
+          limit_high: 5,
+          since: raw.timestamp,
+        },
+      ],
+    });
+    expect(record.tier1Protected).toBe(true);
+    expect(record.temperatureStatus).toBe('CRITICAL');
+    expect(record.temperatures?.display_freezer_temp).toBeUndefined();
+    expect(record.temperatureAlerts?.[0].since).toBe(Date.UTC(2025, 5, 1));
+    expect(adaptRecord(raw).temperatureStatus).toBeUndefined();
+  });
+  it('rejects malformed temperature payloads', () => {
+    expect(() =>
+      adaptRecord({
+        ...raw,
+        temperatures: { cold_room_temp: NaN },
+        temperature_status: 'OK',
+        temperature_alerts: [],
+      }),
+    ).toThrow();
+    expect(() => adaptRecord({ ...raw, temperature_status: 'UNKNOWN' })).toThrow();
+  });
   it('normalizes an import record without a price', () => {
     const record = adaptRecord(raw);
     expect(record.gridPower).toBe(12.4);
