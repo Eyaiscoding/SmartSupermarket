@@ -149,5 +149,23 @@ services:
     volumes:
       - ./data:/app/data:ro
 
+  # -- MPC Microservice --------------------------------------------------------
+  mpc:
+    build:
+      context: .
+      dockerfile: services/mpc/Dockerfile
+    container_name: b2g-mpc
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      PYTHONUNBUFFERED: "1"
+      MPC_HORIZON_HOURS: "24"
+      MPC_TIME_STEP_MINUTES: "15"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      forecasting:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   timescale_data:
