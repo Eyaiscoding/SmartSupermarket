@@ -14,8 +14,7 @@ export const dateTime = (value: number) =>
     hour: '2-digit',
     minute: '2-digit',
   })
-    .format(value)
-    .replace(' ', ' ');
+    .format(value);
 export const time = (value: number) =>
   new Intl.DateTimeFormat('fr-FR', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' }).format(
     value,
