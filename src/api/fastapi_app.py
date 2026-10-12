@@ -19,6 +19,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+import time
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -49,6 +51,12 @@ from src.compliance import (
 )
 from src.api import OutputWriter, OutputRecord
 from src.api.output import compute_coverage_status
+from src.api.models import NeighborModel, NeighborSummaryModel
+from src.p2p.pipeline import NeighborMarket
+from src.p2p.loader import load_neighbors
+from src.p2p.matching import summarize
+from src.monitoring.temperature import TemperatureMonitor
+from src.api.models import TemperatureAlertHistoryModel
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +140,8 @@ def _run_pipeline_sync(
     """Run the full pipeline synchronously. Returns (records, summary)."""
 
     df = load_dataset()
+    market = NeighborMarket.for_run(df["timestamp"])
+    temperature_monitor = TemperatureMonitor.from_env()
 
     # Inject stress scenario if requested.
     if scenario == "forced_grid_outage":
@@ -216,6 +226,8 @@ def _run_pipeline_sync(
             current_p2p=float(row["p2p_energy"]),
         )
         battery_soc = dispatch.battery_soc_after
+        market_output = market.settle(row["timestamp"], dispatch.grid_power,
+                                      float(row["energy_price"])) if market else {}
 
         supply = float(row["pv_power"]) + max(dispatch.battery_power, 0.0)
         supply += max(dispatch.grid_power, 0.0)
@@ -252,6 +264,10 @@ def _run_pipeline_sync(
             "p2p_energy": round(dispatch.p2p_energy, 2),
             "anomaly_flag": anomaly_flag,
             "anomaly_source": anomaly_source,
+            **market_output,
+            **({"demand_kw": max(float(row["total_consumption"]) - dispatch.shed_kw, 0),
+                "pv_power": float(row["pv_power"])} if market else {}),
+            **temperature_monitor.observe(row["timestamp"], row),
         }
         records.append(rec)
 
@@ -294,6 +310,45 @@ def _run_pipeline_sync(
 
 
 # -- REST Endpoints -----------------------------------------------------------
+
+@app.get("/api/v1/neighbors", response_model=list[NeighborModel])
+async def get_neighbors():
+    try:
+        book = await asyncio.to_thread(load_neighbors)
+        return book.neighbors
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=503, detail=f"Neighbour data unavailable: {exc}") from exc
+
+
+@app.get("/api/v1/p2p/summary", response_model=list[NeighborSummaryModel])
+async def get_p2p_summary(start: datetime, end: datetime, scenario: str = "normal"):
+    def simulation_time(value: datetime) -> str:
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.isoformat(sep=" ")
+    first, last = simulation_time(start), simulation_time(end)
+    if first > last:
+        raise HTTPException(status_code=422, detail="start must not be after end")
+    if not _timescale_store:
+        raise HTTPException(status_code=503, detail="TimescaleDB not available.")
+    rows = await asyncio.to_thread(_timescale_store.query_range, first, last, scenario_label=scenario)
+    return summarize(rows)
+
+@app.get("/api/v1/alerts/temperature", response_model=list[TemperatureAlertHistoryModel])
+async def get_temperature_alerts(start: datetime, end: datetime, scenario: str = "normal"):
+    def normalize(value: datetime) -> str:
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.isoformat(sep=" ")
+    first, last = normalize(start), normalize(end)
+    if first > last:
+        raise HTTPException(status_code=422, detail="start must not be after end")
+    if not _timescale_store:
+        raise HTTPException(status_code=503, detail="TimescaleDB not available.")
+    rows = await asyncio.to_thread(_timescale_store.query_range, first, last, scenario_label=scenario)
+    return [{"timestamp": row["timestamp"], **alert}
+            for row in rows for alert in row.get("temperature_alerts") or []]
+
 
 @app.get("/health")
 async def health():

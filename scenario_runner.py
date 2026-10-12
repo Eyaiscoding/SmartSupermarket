@@ -45,6 +45,8 @@ from src.compliance import (
 )
 from src.api import OutputWriter, OutputRecord
 from src.api.output import compute_coverage_status
+from src.p2p.pipeline import NeighborMarket
+from src.monitoring.temperature import TemperatureMonitor
 
 
 # -- Stress-scenario injection ------------------------------------------------
@@ -109,6 +111,8 @@ def run_pipeline(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     n = len(df)
+    market = NeighborMarket.for_run(df["timestamp"])
+    temperature_monitor = TemperatureMonitor.from_env()
     print(f"\n{'='*60}")
     print(f"  Running pipeline: {label}  ({n} timesteps)")
     print(f"{'='*60}")
@@ -189,6 +193,8 @@ def run_pipeline(
             current_p2p=float(row["p2p_energy"]),
         )
         battery_soc = dispatch.battery_soc_after
+        market_output = market.settle(row["timestamp"], dispatch.grid_power,
+                                      float(row["energy_price"])) if market else {}
 
         # Compliance.
         supply = float(row["pv_power"]) + max(dispatch.battery_power, 0.0)
@@ -217,7 +223,7 @@ def run_pipeline(
         )
 
         # Build output record.
-        record = OutputRecord(
+        record_values = dict(
             timestamp=str(row["timestamp"]),
             coverage_ratio=round(coverage, 4),
             coverage_status=compute_coverage_status(coverage),
@@ -229,6 +235,12 @@ def run_pipeline(
             anomaly_flag=anomaly_flag,
             anomaly_source=anomaly_source,
         )
+        record_values.update(market_output)
+        if market:
+            record_values.update(demand_kw=max(float(row["total_consumption"]) - dispatch.shed_kw, 0),
+                                 pv_power=float(row["pv_power"]))
+        record_values.update(temperature_monitor.observe(row["timestamp"], row))
+        record = OutputRecord(**record_values)
         writer.add(record)
 
     # -- Layer 5: Compliance report -------------------------------------------

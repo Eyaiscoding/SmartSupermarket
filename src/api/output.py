@@ -29,6 +29,8 @@ from pathlib import Path
 import pandas as pd
 
 from src.mpc.coordinator import COVERAGE_AT_RISK
+from src.p2p.models import MARKET_OPTIONAL_FIELDS
+from src.monitoring.temperature import TEMPERATURE_OPTIONAL_FIELDS
 
 
 @dataclass
@@ -45,9 +47,26 @@ class OutputRecord:
     p2p_energy: float
     anomaly_flag: bool
     anomaly_source: str | None
+    p2p_import: float | None = None
+    p2p_export: float | None = None
+    p2p_trades: list[dict] | None = None
+    p2p_savings: float | None = None
+    cost: float | None = None
+    revenue: float | None = None
+    energy_price: float | None = None
+    sell_price: float | None = None
+    p2p_price: float | None = None
+    temperatures: dict[str, float] | None = None
+    temperature_alerts: list[dict] | None = None
+    temperature_status: str | None = None
+    temperature_limits: dict | None = None
+    neighbors: list[dict] | None = None
+    demand_kw: float | None = None
+    pv_power: float | None = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return {key: value for key, value in asdict(self).items()
+                if key not in MARKET_OPTIONAL_FIELDS + TEMPERATURE_OPTIONAL_FIELDS or value is not None}
 
 
 def compute_coverage_status(ratio: float) -> str:
@@ -90,6 +109,10 @@ class OutputWriter:
         df["active_actions"] = df["active_actions"].apply(
             lambda x: ";".join(x) if x else ""
         )
+        for column in ("p2p_trades", "temperatures", "temperature_alerts", "temperature_limits", "neighbors"):
+            if column in df.columns:
+                df[column] = df[column].apply(
+                    lambda value: json.dumps(value, ensure_ascii=False) if isinstance(value, (list, dict)) else "")
         df.to_csv(path, index=False)
 
     def summary(self) -> dict:
