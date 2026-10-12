@@ -196,13 +196,21 @@ def run_pipeline(
                                       float(row["energy_price"])) if market else {}
 
         # Compliance.
-        supply = float(row["pv_power"]) + max(dispatch.battery_power, 0.0)
-        supply += max(dispatch.grid_power, 0.0)
+        # R2: Check if physical supply sources can cover Tier 1 demand
+        # This is independent of MPC shedding decisions (which are checked by R1)
+        tier_1_demand = tier_1_demand_kw(row)
+        pv_available = float(row["pv_power"])
+        battery_discharge_available = max(dispatch.battery_power, 0.0)
+        # For R2, grid is assumed available unless scenario forces outage
+        grid_available = max(dispatch.grid_power, 0.0) if label != "forced_grid_outage" else 0.0
+
+        supply_kw = pv_available + battery_discharge_available + grid_available
+
         tier_1_ok = checker.check_step(
             action,
             timestamp=str(row["timestamp"]),
-            tier_1_demand_kw=tier_1_demand_kw(row),
-            supply_kw=supply,
+            tier_1_demand_kw=tier_1_demand,
+            supply_kw=supply_kw,
             battery_soc=battery_soc,
             battery_power_kw=dispatch.battery_power,
             cold_temps=cold_chain_temps(row),
@@ -210,7 +218,7 @@ def run_pipeline(
 
         # Coverage ratio.
         total_c = float(row["total_consumption"])
-        coverage = supply / total_c if total_c > 0 else 1.0
+        coverage = supply_kw / total_c if total_c > 0 else 1.0
         coverage = min(coverage, 1.0)
 
         # Anomaly info for this row.

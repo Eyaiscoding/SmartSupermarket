@@ -130,8 +130,9 @@ class MPCCoordinator:
             )
             if hvac_budget and hvac_budget.max_reduction_kw > 0:
                 action.load_shift_hvac = True
-                action.hvac_shed_kw = hvac_budget.max_reduction_kw
-                net_demand -= hvac_budget.max_reduction_kw
+                # Only shed 50% of HVAC during DR to reserve capacity for hard shedding
+                action.hvac_shed_kw = hvac_budget.max_reduction_kw * 0.5
+                net_demand -= action.hvac_shed_kw
                 action.active_action_names.append("hvac_soft_shed")
 
         # ── 3. Valley filling ────────────────────────────────────────────
