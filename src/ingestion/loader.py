@@ -8,12 +8,14 @@ layers to consume.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
 import numpy as np
 import pandas as pd
+from .schema import normalize_column, resolve_csv
 
 # ── Expected schema ──────────────────────────────────────────────────────────
 EXPECTED_COLUMNS: list[str] = [
@@ -48,6 +50,9 @@ EXPECTED_COLUMNS: list[str] = [
     "forecast_pv",
     "anomaly_score",
 ]
+
+TEMPERATURE_COLUMNS = ["display_freezer_temp", "freezer_room_temp",
+                       "display_refrigerator_temp", "cold_room_temp"]
 
 
 @dataclass
@@ -84,6 +89,10 @@ class TimestepState:
     forecast_consumption: float
     forecast_pv: float
     anomaly_score: float
+    display_freezer_temp: float | None = None
+    freezer_room_temp: float | None = None
+    display_refrigerator_temp: float | None = None
+    cold_room_temp: float | None = None
 
 
 # ── Loader ───────────────────────────────────────────────────────────────────
@@ -128,16 +137,21 @@ def load_dataset(
         chronologically, and with an ``index`` column (if present) dropped.
     """
     if path is None:
-        path = _find_dataset(project_root)
-    path = Path(path)
+        from src.p2p.config import enabled, supermarket_csv
+        path = supermarket_csv() if enabled() or os.getenv("B2G_SUPERMARKET_CSV") else _find_dataset(project_root)
+    path = resolve_csv(path)
     if not path.is_file():
         raise FileNotFoundError(f"Cannot open {path}")
 
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, encoding="utf-8-sig")
+    df.columns = [normalize_column(c) for c in df.columns]
+    if df.columns.duplicated().any():
+        raise ValueError("Duplicate columns after normalization")
+    optional = [c for c in TEMPERATURE_COLUMNS if c in df.columns]
 
     # ── Schema validation ────────────────────────────────────────────────
     missing_cols = set(EXPECTED_COLUMNS) - set(df.columns)
-    extra_cols = set(df.columns) - set(EXPECTED_COLUMNS)
+    extra_cols = set(df.columns) - set(EXPECTED_COLUMNS) - set(TEMPERATURE_COLUMNS)
     if missing_cols:
         raise ValueError(f"Missing expected columns: {sorted(missing_cols)}")
     if extra_cols:
@@ -146,7 +160,10 @@ def load_dataset(
         warnings.warn(f"Unexpected extra columns (ignored): {sorted(extra_cols)}")
 
     # Keep only expected columns in canonical order.
-    df = df[EXPECTED_COLUMNS].copy()
+    df = df[EXPECTED_COLUMNS + optional].copy()
+    for column in optional:
+        # Never invent a safe temperature by copying another sensor reading.
+        df[column] = pd.to_numeric(df[column], errors="coerce").replace([np.inf, -np.inf], np.nan)
 
     # ── Type coercions ───────────────────────────────────────────────────
     df["timestamp"] = pd.to_datetime(df["timestamp"])
@@ -155,7 +172,7 @@ def load_dataset(
 
     # ── Missing-value handling ───────────────────────────────────────────
     # For numeric columns: forward-fill then back-fill (sensor continuity).
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    numeric_cols = df[EXPECTED_COLUMNS].select_dtypes(include=[np.number]).columns
     df[numeric_cols] = df[numeric_cols].ffill().bfill()
 
     # ── Sort by time ─────────────────────────────────────────────────────
@@ -198,4 +215,6 @@ def iter_timesteps(df: pd.DataFrame) -> Iterator[TimestepState]:
             forecast_consumption=float(row.forecast_consumption),
             forecast_pv=float(row.forecast_pv),
             anomaly_score=float(row.anomaly_score),
+            **{key: (float(getattr(row, key)) if pd.notna(getattr(row, key, None)) else None)
+               for key in TEMPERATURE_COLUMNS},
         )

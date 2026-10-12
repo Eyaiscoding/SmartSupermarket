@@ -51,11 +51,11 @@ class RedisCache:
         return self._client is not None
 
     def set_latest(self, record_dict: dict) -> None:
-        """Cache the latest output record."""
+        """Cache the complete record, including optional tariffs and nested P2P trades."""
         if not self.available:
             return
         try:
-            self._client.set(self.LATEST_KEY, json.dumps(record_dict))
+            self._client.set(self.LATEST_KEY, json.dumps(record_dict, ensure_ascii=False, allow_nan=False))
         except Exception as exc:
             logger.warning("Redis SET failed: %s", exc)
 

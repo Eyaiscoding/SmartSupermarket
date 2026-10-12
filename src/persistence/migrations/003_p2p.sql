@@ -1,0 +1,10 @@
+-- Nullable additions retain existing rows and old consumers; safe on repeated startup.
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_import DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_export DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_trades JSONB;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_savings DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS cost DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS revenue DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS energy_price DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS sell_price DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_price DOUBLE PRECISION;

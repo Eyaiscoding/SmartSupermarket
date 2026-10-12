@@ -37,9 +37,15 @@ from src.ingestion import load_dataset  # noqa: E402
 from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator  # noqa: E402
 from src.mpc import MPCCoordinator  # noqa: E402
 from src.derms import DERMSDispatcher  # noqa: E402
-from src.compliance import ComplianceChecker, cold_chain_temps, tier_1_demand_kw  # noqa: E402
+from src.compliance import (  # noqa: E402
+    ComplianceChecker,
+    cold_chain_temps,
+    tier_1_demand_kw,
+)
 from src.api import OutputWriter, OutputRecord  # noqa: E402
 from src.api.output import compute_coverage_status  # noqa: E402
+from src.p2p.pipeline import NeighborMarket  # noqa: E402
+from src.monitoring.temperature import TemperatureMonitor  # noqa: E402
 
 
 # -- Stress-scenario injection ------------------------------------------------
@@ -104,6 +110,8 @@ def run_pipeline(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     n = len(df)
+    market = NeighborMarket.for_run(df["timestamp"])
+    temperature_monitor = TemperatureMonitor.from_env()
     print(f"\n{'='*60}")
     print(f"  Running pipeline: {label}  ({n} timesteps)")
     print(f"{'='*60}")
@@ -184,15 +192,25 @@ def run_pipeline(
             current_p2p=float(row["p2p_energy"]),
         )
         battery_soc = dispatch.battery_soc_after
+        market_output = market.settle(row["timestamp"], dispatch.grid_power,
+                                      float(row["energy_price"])) if market else {}
 
         # Compliance.
-        supply = float(row["pv_power"]) + max(dispatch.battery_power, 0.0)
-        supply += max(dispatch.grid_power, 0.0)
+        # R2: Check if physical supply sources can cover Tier 1 demand
+        # This is independent of MPC shedding decisions (which are checked by R1)
+        tier_1_demand = tier_1_demand_kw(row)
+        pv_available = float(row["pv_power"])
+        battery_discharge_available = max(dispatch.battery_power, 0.0)
+        # For R2, grid is assumed available unless scenario forces outage
+        grid_available = max(dispatch.grid_power, 0.0) if label != "forced_grid_outage" else 0.0
+
+        supply_kw = pv_available + battery_discharge_available + grid_available
+
         tier_1_ok = checker.check_step(
             action,
             timestamp=str(row["timestamp"]),
-            tier_1_demand_kw=tier_1_demand_kw(row),
-            supply_kw=supply,
+            tier_1_demand_kw=tier_1_demand,
+            supply_kw=supply_kw,
             battery_soc=battery_soc,
             battery_power_kw=dispatch.battery_power,
             cold_temps=cold_chain_temps(row),
@@ -200,7 +218,7 @@ def run_pipeline(
 
         # Coverage ratio.
         total_c = float(row["total_consumption"])
-        coverage = supply / total_c if total_c > 0 else 1.0
+        coverage = supply_kw / total_c if total_c > 0 else 1.0
         coverage = min(coverage, 1.0)
 
         # Anomaly info for this row.
@@ -212,7 +230,7 @@ def run_pipeline(
         )
 
         # Build output record.
-        record = OutputRecord(
+        record_values = dict(
             timestamp=str(row["timestamp"]),
             coverage_ratio=round(coverage, 4),
             coverage_status=compute_coverage_status(coverage),
@@ -224,6 +242,12 @@ def run_pipeline(
             anomaly_flag=anomaly_flag,
             anomaly_source=anomaly_source,
         )
+        record_values.update(market_output)
+        if market:
+            record_values.update(demand_kw=max(float(row["total_consumption"]) - dispatch.shed_kw, 0),
+                                 pv_power=float(row["pv_power"]))
+        record_values.update(temperature_monitor.observe(row["timestamp"], row))
+        record = OutputRecord(**record_values)
         writer.add(record)
 
     # -- Layer 5: Compliance report -------------------------------------------

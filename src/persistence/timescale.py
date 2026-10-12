@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 
 from sqlalchemy import (
     Column,
@@ -18,10 +19,16 @@ from sqlalchemy import (
     Text,
     create_engine,
     text,
+    JSON,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from src.config import settings
+from src.p2p.models import MARKET_OPTIONAL_FIELDS
+from src.monitoring.temperature import TEMPERATURE_OPTIONAL_FIELDS
+
+OPTIONAL_FIELDS = MARKET_OPTIONAL_FIELDS + TEMPERATURE_OPTIONAL_FIELDS
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +55,22 @@ class OutputRecordRow(Base):
     anomaly_flag = Column(Boolean, nullable=False)
     anomaly_source = Column(String, nullable=True)
     scenario_label = Column(String, nullable=False, default="normal", primary_key=True)
+    p2p_import = Column(Float, nullable=True)
+    p2p_export = Column(Float, nullable=True)
+    p2p_trades = Column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    p2p_savings = Column(Float, nullable=True)
+    cost = Column(Float, nullable=True)
+    revenue = Column(Float, nullable=True)
+    energy_price = Column(Float, nullable=True)
+    sell_price = Column(Float, nullable=True)
+    p2p_price = Column(Float, nullable=True)
+    temperatures = Column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    temperature_alerts = Column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    temperature_status = Column(String(8), nullable=True)
+    temperature_limits = Column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    neighbors = Column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    demand_kw = Column(Float, nullable=True)
+    pv_power = Column(Float, nullable=True)
 
 
 # -- Engine & init ------------------------------------------------------------
@@ -71,6 +94,11 @@ def init_db(url: str | None = None) -> None:
     global _SessionLocal
     engine = get_engine(url)
     Base.metadata.create_all(engine)
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            for name in ("003_p2p.sql", "004_temperature.sql", "005_dashboard.sql"):
+                migration = Path(__file__).with_name("migrations") / name
+                conn.execute(text(migration.read_text(encoding="utf-8")))
     _SessionLocal = sessionmaker(bind=engine)
 
     # Try to make the table a hypertable (no-op if already done or if
@@ -121,6 +149,7 @@ class TimescaleStore:
                 anomaly_flag=record_dict["anomaly_flag"],
                 anomaly_source=record_dict.get("anomaly_source"),
                 scenario_label=scenario_label,
+                **{key: record_dict.get(key) for key in OPTIONAL_FIELDS},
             )
             session.merge(row)  # upsert
             session.commit()
@@ -146,6 +175,7 @@ class TimescaleStore:
                     anomaly_flag=rec["anomaly_flag"],
                     anomaly_source=rec.get("anomaly_source"),
                     scenario_label=scenario_label,
+                    **{key: rec.get(key) for key in OPTIONAL_FIELDS},
                 )
                 session.merge(row)
             session.commit()
@@ -217,4 +247,6 @@ class TimescaleStore:
             "p2p_energy": row.p2p_energy,
             "anomaly_flag": row.anomaly_flag,
             "anomaly_source": row.anomaly_source,
+            **{key: getattr(row, key) for key in OPTIONAL_FIELDS
+               if getattr(row, key) is not None},
         }
