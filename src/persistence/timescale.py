@@ -94,12 +94,21 @@ def init_db(url: str | None = None) -> None:
     global _SessionLocal
     engine = get_engine(url)
     Base.metadata.create_all(engine)
-    if engine.dialect.name == "postgresql":
-        with engine.begin() as conn:
-            for name in ("003_p2p.sql", "004_temperature.sql", "005_dashboard.sql"):
-                migration = Path(__file__).with_name("migrations") / name
-                conn.execute(text(migration.read_text(encoding="utf-8")))
     _SessionLocal = sessionmaker(bind=engine)
+    
+    # Optional: apply migrations if they exist
+    if engine.dialect.name == "postgresql":
+        migrations_dir = Path(__file__).resolve().parents[2] / "migrations"
+        if migrations_dir.exists():
+            try:
+                with engine.begin() as conn:
+                    for name in ("003_p2p.sql", "004_temperature.sql", "005_dashboard.sql"):
+                        migration_file = migrations_dir / name
+                        if migration_file.exists():
+                            conn.execute(text(migration_file.read_text(encoding="utf-8")))
+                logger.info("Database migrations applied successfully.")
+            except Exception as exc:
+                logger.warning("Migration application failed (non-fatal): %s", exc)
 
     # Try to make the table a hypertable (no-op if already done or if
     # the timescaledb extension isn't loaded).
