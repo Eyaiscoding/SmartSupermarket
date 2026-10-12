@@ -9,7 +9,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      test: ["CMD", "bash", "-c", "echo srvr | nc localhost 2181 | grep -q Mode"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -131,6 +131,23 @@ services:
       retries: 5
       start_period: 60s
     restart: unless-stopped
+
+  # -- Forecasting Microservice ------------------------------------------------
+  forecasting:
+    build:
+      context: .
+      dockerfile: services/forecasting/Dockerfile
+    container_name: b2g-forecasting
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      TRAINING_DATA_PATH: /app/data/dataset.csv
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data:ro
 
 volumes:
   timescale_data:
