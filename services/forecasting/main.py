@@ -153,6 +153,13 @@ class ForecastingService(MessageProcessor):
                 'anomaly_source': anomaly_result.get('source'),
                 # Flexibility estimation
                 'flexibility_budgets': flexibility,
+                # Telemetry context (for downstream services like MPC)
+                'telemetry': {
+                    'hvac_power': telemetry.get('hvac_power', 0.0),
+                    'lighting_power': telemetry.get('lighting_power', 0.0),
+                    'checkout_power': telemetry.get('checkout_power', 0.0),
+                    'other_appliance_power': telemetry.get('other_appliance_power', 0.0),
+                },
             }
             
             logger.debug(f"Prediction generated for {timestamp}: "

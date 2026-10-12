@@ -60,6 +60,12 @@ def test_mpc_service():
             'lighting_shed_kw': 8.3,
             'checkout_shed_kw': 2.1,
             'other_shed_kw': 5.4
+        },
+        'telemetry': {
+            'hvac_power': 25.0,
+            'lighting_power': 16.6,
+            'checkout_power': 42.0,
+            'other_appliance_power': 10.8
         }
     }
     

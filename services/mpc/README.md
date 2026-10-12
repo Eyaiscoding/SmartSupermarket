@@ -77,9 +77,17 @@ Consumed from the Forecasting microservice:
     "lighting_shed_kw": 8.3,
     "checkout_shed_kw": 2.1,
     "other_shed_kw": 5.4
+  },
+  "telemetry": {
+    "hvac_power": 25.0,
+    "lighting_power": 16.6,
+    "checkout_power": 42.0,
+    "other_appliance_power": 10.8
   }
 }
 ```
+
+**Note**: The `telemetry` field is optional. If missing, the MPC service uses typical supermarket power defaults (HVAC: 50kW, Lighting: 30kW, Checkout: 20kW, Other: 25kW) to construct FlexBudget objects.
 
 ### Output: `mpc.decisions`
 
@@ -109,8 +117,23 @@ Environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9093` | Kafka broker addresses |
-| `MPC_HORIZON_HOURS` | `24` | Planning horizon in hours |
+| `MPC_HORIZON_HOURS` | `24` | Planning horizon in hours (capped at 4 timesteps in v1) |
 | `MPC_TIME_STEP_MINUTES` | `15` | Discretization timestep |
+
+**Note**: The MPC controller currently caps the horizon at 4 timesteps regardless of `MPC_HORIZON_HOURS` configuration, as the current implementation is optimized for short-term (1-hour) decisions. Future versions may support longer horizons.
+
+## Known Limitations & Technical Debt
+
+### Single-timestep Forecasts (Phase 6 Enhancement)
+
+The forecasting service currently publishes single-timestep predictions (`forecast_consumption`, `forecast_pv`). The MPC service replicates these values across the horizon, which produces **valid but suboptimal** decisions:
+
+- **Impact**: The optimizer sees a flat future and cannot anticipate upcoming PV dips or consumption peaks
+- **Example**: Valley-filling logic (pre-charging battery before forecasted PV drops) will never trigger
+- **Workaround**: The controller still makes safe decisions based on current conditions
+- **Fix**: Forecasting service should publish horizon-length forecast vectors in future phases
+
+This limitation is documented as technical debt for **Phase 6 (Observability & Optimization)**.
 
 ## MPC Controller Details
 

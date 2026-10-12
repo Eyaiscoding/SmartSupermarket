@@ -71,10 +71,11 @@ class MPCService(MessageProcessor):
         
         # Initialize MPC controller
         self.horizon_steps = (horizon_hours * 60) // time_step_minutes
-        logger.info(f"Initializing MPC controller with horizon={self.horizon_steps} steps...")
-        self.coordinator = MPCCoordinator(
-            horizon=min(self.horizon_steps, 4)  # Cap at 4 steps as per coordinator default
-        )
+        # Cap horizon at 4 steps as per coordinator implementation limits
+        capped_horizon = min(self.horizon_steps, 4)
+        logger.info(f"Initializing MPC controller with horizon={capped_horizon} steps "
+                   f"(requested={self.horizon_steps}, capped at 4)")
+        self.coordinator = MPCCoordinator(horizon=capped_horizon)
         
         logger.info("MPC service initialized successfully")
     
@@ -104,8 +105,12 @@ class MPCService(MessageProcessor):
             flexibility_budgets = prediction.get('flexibility_budgets', {})
             anomaly_flag = prediction.get('anomaly_flag', False)
             
+            # Extract telemetry data (forecasting service includes it for context)
+            # If not available, use empty dict as fallback
+            telemetry = prediction.get('telemetry', {})
+            
             # Convert flexibility budgets dict to FlexBudget list
-            flex_budgets = self._parse_flexibility_budgets(flexibility_budgets)
+            flex_budgets = self._parse_flexibility_budgets(flexibility_budgets, telemetry)
             
             # Current state assumptions (in real system, would come from state service)
             # For now, use sensible defaults
@@ -115,6 +120,14 @@ class MPCService(MessageProcessor):
             demand_response = 0  # No DR event active
             
             # Build forecast vectors (replicate current forecast for horizon)
+            # TODO: Multi-step forecast vectors — The forecasting service currently publishes
+            # single-timestep predictions. Replicating them defeats receding-horizon optimization
+            # because the optimizer sees a flat future and cannot anticipate upcoming PV dips or
+            # consumption peaks. Valley-filling logic will never trigger. To fix: forecasting
+            # service should publish horizon-length forecast vectors (forecast_consumption_vec,
+            # forecast_pv_vec) instead of single values. This is captured as technical debt for
+            # Phase 6 (Observability & Optimization). The current approach produces valid but
+            # suboptimal MPC decisions.
             forecast_consumption_vec = [forecast_consumption] * self.coordinator.horizon
             forecast_pv_vec = [forecast_pv] * self.coordinator.horizon
             forecast_prices_vec = [energy_price] * self.coordinator.horizon
@@ -158,7 +171,7 @@ class MPCService(MessageProcessor):
             logger.error(f"Error processing message for {timestamp}: {e}", exc_info=True)
             return None
     
-    def _parse_flexibility_budgets(self, budgets_dict: dict) -> list[FlexBudget]:
+    def _parse_flexibility_budgets(self, budgets_dict: dict, telemetry: dict) -> list[FlexBudget]:
         """
         Convert flexibility budgets dict from forecasting service to FlexBudget list.
         
@@ -166,6 +179,9 @@ class MPCService(MessageProcessor):
         ----------
         budgets_dict : dict
             Dictionary with keys like 'hvac_soft_shed_kw', 'lighting_shed_kw', etc.
+        telemetry : dict
+            Optional telemetry data containing actual appliance power draws.
+            If unavailable, typical supermarket load defaults are used.
         
         Returns
         -------
@@ -174,21 +190,36 @@ class MPCService(MessageProcessor):
         """
         flex_budgets = []
         
-        # Map budget keys to tier and group name
+        # Typical supermarket appliance power draws (kW) for fallback when telemetry unavailable
+        TYPICAL_POWER_DEFAULTS = {
+            'hvac_power': 50.0,          # HVAC system
+            'lighting_power': 30.0,      # Store lighting
+            'checkout_power': 20.0,      # Checkout & IT
+            'other_appliance_power': 25.0  # Other flexible loads
+        }
+        
+        # Map budget keys to tier, group name, and power key from telemetry
+        # (shed_key, group, power_key, tier, duration)
         budget_mapping = [
-            ('hvac_soft_shed_kw', 'hvac', 3, 60.0),  # Tier 3, 60 min duration
-            ('lighting_shed_kw', 'lighting', 4, 240.0),  # Tier 4, 240 min duration
-            ('checkout_shed_kw', 'checkout', 2, 15.0),  # Tier 2, 15 min duration
-            ('other_shed_kw', 'other_appliance', 4, 240.0),  # Tier 4, 240 min duration
+            ('hvac_soft_shed_kw', 'hvac', 'hvac_power', 3, 60.0),
+            ('lighting_shed_kw', 'lighting', 'lighting_power', 4, 240.0),
+            ('checkout_shed_kw', 'checkout', 'checkout_power', 2, 15.0),
+            ('other_shed_kw', 'other_appliance', 'other_appliance_power', 4, 240.0),
         ]
         
-        for key, group, tier, duration in budget_mapping:
-            shed_capacity = budgets_dict.get(key, 0.0)
-            if shed_capacity > 0:
+        for shed_key, group, power_key, tier, duration in budget_mapping:
+            shed_capacity = budgets_dict.get(shed_key, 0.0)
+            
+            # Get actual current power from telemetry, fallback to typical supermarket defaults
+            # Note: Forecasting service doesn't currently publish appliance power in telemetry field.
+            # This is captured as technical debt for Phase 2 enhancement.
+            current_power = telemetry.get(power_key, TYPICAL_POWER_DEFAULTS.get(power_key, 0.0))
+            
+            if shed_capacity > 0 or current_power > 0:
                 flex_budgets.append(
                     FlexBudget(
                         group=group,
-                        current_power_kw=shed_capacity,  # Approximation: use shed capacity as current power
+                        current_power_kw=current_power,
                         max_reduction_kw=shed_capacity,
                         max_duration_min=duration,
                         tier=tier
