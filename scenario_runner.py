@@ -36,7 +36,6 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.ingestion import load_dataset
 from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator
 from src.mpc import MPCCoordinator
-from src.mpc.coordinator import COVERAGE_AT_RISK
 from src.derms import DERMSDispatcher
 from src.compliance import (
     ComplianceChecker,

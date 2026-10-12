@@ -19,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-import time
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -38,18 +37,15 @@ from src.api.models import (  # noqa: E402
     ScenarioRequest,
     PipelineSummary,
 )
-from src.config import settings
 from src.ingestion import load_dataset
 from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator
 from src.mpc import MPCCoordinator
-from src.mpc.coordinator import COVERAGE_AT_RISK
 from src.derms import DERMSDispatcher
 from src.compliance import (
     ComplianceChecker,
     cold_chain_temps,
     tier_1_demand_kw,
 )
-from src.api import OutputWriter, OutputRecord
 from src.api.output import compute_coverage_status
 from src.api.models import NeighborModel, NeighborSummaryModel
 from src.p2p.pipeline import NeighborMarket
