@@ -1,0 +1,21 @@
+-- Add P2P columns
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_import DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_export DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_trades JSONB;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_savings DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS cost DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS revenue DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS energy_price DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS sell_price DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS p2p_price DOUBLE PRECISION;
+
+-- Add temperature columns
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS temperatures JSONB;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS temperature_alerts JSONB;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS temperature_status VARCHAR(8);
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS temperature_limits JSONB;
+
+-- Add neighbor columns
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS neighbors JSONB;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS demand_kw DOUBLE PRECISION;
+ALTER TABLE output_records ADD COLUMN IF NOT EXISTS pv_power DOUBLE PRECISION;
