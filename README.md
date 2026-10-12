@@ -320,4 +320,31 @@ SmartSupermarket/
 
 ## Team & Scope
 
+### Phase 3: neighbour settlement (Part A)
+
+P2P trading is opt-in and runs after DERMS without changing MPC or Tier 1 logic.
+The original dataset and behavior remain the default. To enable it in PowerShell:
+
+```powershell
+python -m pip install -r requirements.txt
+$env:B2G_P2P_ENABLED = "true"
+python scenario_runner.py
+# Or serve REST / WebSocket:
+python -m uvicorn src.api.fastapi_app:app --port 8000
+```
+
+The supplied `data1/dataset_modified.csv` is the supermarket file; the long
+`smart_supermarket_neighbor_buildings_4months_15min1.csv` filename contains the
+neighbours. These are the new feature defaults. Override them with
+`B2G_SUPERMARKET_CSV` and `B2G_NEIGHBORS_CSV`. See the
+[data audit](docs/PHASE3_DATA_AUDIT.md) and
+[dataset/market contract](docs/DATASET.md#phase-3-optional-datasets-and-columns)
+for assumptions, all tariff variables, accounting units, endpoints and migration.
+
+Run `python -m pytest tests/ -q` for regression checks or
+`python -m pytest tests/test_p2p.py -q` for the P2P checks. Temperature monitoring
+(Part B) is implemented; the broader dashboard awaits the Part C specification.
+With P2P disabled, set `B2G_SUPERMARKET_CSV=data1/dataset_modified.csv` to monitor
+the four sensors. See [temperature configuration](docs/DATASET.md#temperature-monitoring-part-b).
+
 This repository covers the **backend simulation engine only**. The dashboard and compliance reporting layers are built separately by other team members and consume this module's output contract (the JSON/CSV files and the REST/WebSocket API described above). The API layer in this repo produces the data; it does not render any frontend UI.

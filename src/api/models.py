@@ -9,9 +9,70 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 from typing import Optional
+from typing import Literal
 
 
-class OutputRecordModel(BaseModel):
+class P2PTradeModel(BaseModel):
+    counterparty_id: str
+    building_type: str
+    direction: Literal["buy", "sell"]
+    quantity_kw: float = Field(ge=0)
+    quantity_kwh: float = Field(ge=0)
+    price_per_kwh: float
+    wheeling_fee: float = Field(ge=0, description="EUR/kWh, not total fee")
+    distance_km: float = Field(ge=0)
+    saving_vs_grid: float = Field(ge=0, description="EUR for this timestep")
+
+
+class TemperatureAlertModel(BaseModel):
+    sensor: Literal["display_freezer_temp", "freezer_room_temp", "display_refrigerator_temp", "cold_room_temp"]
+    value: float
+    status: Literal["WARNING", "CRITICAL"]
+    limit_low: float
+    limit_high: float
+    since: str
+
+
+class TemperatureAlertHistoryModel(TemperatureAlertModel):
+    timestamp: str
+
+
+class MarketFields(BaseModel):
+    neighbors: list[dict] | None = None
+    demand_kw: float | None = None
+    pv_power: float | None = None
+    temperature_limits: dict[str, dict[str, float]] | None = None
+    temperatures: dict[str, float] | None = None
+    temperature_alerts: list[TemperatureAlertModel] | None = None
+    temperature_status: Literal["OK", "WARNING", "CRITICAL"] | None = None
+    p2p_import: float | None = Field(default=None, ge=0)
+    p2p_export: float | None = Field(default=None, ge=0)
+    p2p_trades: list[P2PTradeModel] | None = None
+    p2p_savings: float | None = None
+    cost: float | None = None
+    revenue: float | None = None
+    energy_price: float | None = None
+    sell_price: float | None = None
+    p2p_price: float | None = None
+
+
+class NeighborModel(BaseModel):
+    id: str
+    type: str
+    distance_km: float
+    production_type: str
+    production_types: list[str]
+
+
+class NeighborSummaryModel(BaseModel):
+    counterparty_id: str
+    building_type: str
+    bought_kwh: float
+    sold_kwh: float
+    money_saved: float
+
+
+class OutputRecordModel(MarketFields):
     """Pydantic model matching the v1 output contract exactly."""
 
     timestamp: str
@@ -45,7 +106,7 @@ class OutputRecordModel(BaseModel):
     }
 
 
-class LatestStateModel(BaseModel):
+class LatestStateModel(MarketFields):
     """The current/latest state cached in Redis."""
 
     timestamp: str
