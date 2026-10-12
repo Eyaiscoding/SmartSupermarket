@@ -23,10 +23,8 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 # Ensure the project root is on sys.path so that ``src`` is importable.
@@ -34,14 +32,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.ingestion import load_dataset
-from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator
-from src.mpc import MPCCoordinator
-from src.mpc.coordinator import COVERAGE_AT_RISK
-from src.derms import DERMSDispatcher
-from src.compliance import ComplianceChecker
-from src.api import OutputWriter, OutputRecord
-from src.api.output import compute_coverage_status
+from src.ingestion import load_dataset  # noqa: E402
+from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator  # noqa: E402
+from src.mpc import MPCCoordinator  # noqa: E402
+from src.derms import DERMSDispatcher  # noqa: E402
+from src.compliance import ComplianceChecker  # noqa: E402
+from src.api import OutputWriter, OutputRecord  # noqa: E402
+from src.api.output import compute_coverage_status  # noqa: E402
 
 
 # -- Stress-scenario injection ------------------------------------------------
@@ -115,7 +112,7 @@ def run_pipeline(
     print("  [1/5] Training forecaster...")
     forecaster = Forecaster(n_estimators=100, max_depth=4)
     train_metrics = forecaster.train(df)
-    pred_df = forecaster.predict(df)
+    _ = forecaster.predict(df)
     print(f"         Consumption MAE: {train_metrics['consumption_mae']:.3f} kW")
     print(f"         PV MAE:          {train_metrics['pv_mae']:.3f} kW")
 

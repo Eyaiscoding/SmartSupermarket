@@ -1,1 +1,1 @@
-from .output import OutputWriter, OutputRecord
+from .output import OutputWriter as OutputWriter, OutputRecord as OutputRecord

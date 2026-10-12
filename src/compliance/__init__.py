@@ -1,1 +1,1 @@
-from .checker import ComplianceChecker, CriticalityTier
+from .checker import ComplianceChecker as ComplianceChecker, CriticalityTier as CriticalityTier

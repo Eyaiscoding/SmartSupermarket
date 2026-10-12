@@ -1,1 +1,1 @@
-from .coordinator import MPCCoordinator
+from .coordinator import MPCCoordinator as MPCCoordinator
