@@ -17,13 +17,10 @@ The pipeline continues to work in dual mode:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import sys
-import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,26 +30,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.api.models import (
+from src.api.models import (  # noqa: E402
     OutputRecordModel,
     LatestStateModel,
     ScenarioRequest,
     PipelineSummary,
-    TimeRangeQuery,
 )
-from src.config import settings
-from src.ingestion import load_dataset
-from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator
-from src.mpc import MPCCoordinator
-from src.mpc.coordinator import COVERAGE_AT_RISK
-from src.derms import DERMSDispatcher
-from src.compliance import (
-    ComplianceChecker,
-    cold_chain_temps,
-    tier_1_demand_kw,
-)
-from src.api import OutputWriter, OutputRecord
-from src.api.output import compute_coverage_status
+from src.ingestion import load_dataset  # noqa: E402
+from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator  # noqa: E402
+from src.mpc import MPCCoordinator  # noqa: E402
+from src.derms import DERMSDispatcher  # noqa: E402
+from src.compliance import ComplianceChecker, cold_chain_temps, tier_1_demand_kw  # noqa: E402
+from src.api.output import compute_coverage_status  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +123,6 @@ def _run_pipeline_sync(
     ws_broadcast: list | None = None,
 ) -> tuple[list[dict], PipelineSummary]:
     """Run the full pipeline synchronously. Returns (records, summary)."""
-    import numpy as np
 
     df = load_dataset()
 
@@ -157,7 +145,7 @@ def _run_pipeline_sync(
     # Train models.
     forecaster = Forecaster(n_estimators=100, max_depth=4)
     forecaster.train(df)
-    pred_df = forecaster.predict(df)
+    _ = forecaster.predict(df)
 
     anomaly_det = AnomalyDetector()
     anomaly_det.train(df)

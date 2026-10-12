@@ -9,7 +9,6 @@ can run without Docker.  The hypertable setup is skipped (SQLite doesn't
 support it), but the ORM read/write logic is exercised identically.
 """
 
-import json
 import sys
 from pathlib import Path
 
@@ -26,7 +25,7 @@ class TestTimescaleStore:
     @pytest.fixture
     def store(self, tmp_path):
         """Create a TimescaleStore backed by a temporary SQLite DB."""
-        from src.persistence.timescale import TimescaleStore, Base, get_engine, _engine
+        from src.persistence.timescale import TimescaleStore
         import src.persistence.timescale as ts_module
 
         # Reset module-level engine to force re-creation.

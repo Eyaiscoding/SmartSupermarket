@@ -23,9 +23,8 @@ Output schema per record::
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
 

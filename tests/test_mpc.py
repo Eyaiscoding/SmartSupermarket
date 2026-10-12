@@ -5,14 +5,13 @@ Tests for Layer 3 — MPC Coordination Core.
 import sys
 from pathlib import Path
 
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.mpc.coordinator import MPCCoordinator, MPCAction
-from src.forecasting.flexibility import FlexBudget
+from src.mpc.coordinator import MPCCoordinator  # noqa: E402
+from src.forecasting.flexibility import FlexBudget  # noqa: E402
 
 
 def _make_budgets(

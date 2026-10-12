@@ -13,8 +13,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.ingestion import load_dataset, TimestepState, EXPECTED_COLUMNS
-from src.ingestion.loader import iter_timesteps
+from src.ingestion import load_dataset, TimestepState, EXPECTED_COLUMNS  # noqa: E402
+from src.ingestion.loader import iter_timesteps  # noqa: E402
 
 
 class TestLoadDataset:

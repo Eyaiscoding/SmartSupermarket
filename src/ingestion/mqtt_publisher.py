@@ -20,7 +20,6 @@ import sys
 import time
 from pathlib import Path
 
-import pandas as pd
 
 try:
     import paho.mqtt.client as mqtt
@@ -33,8 +32,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.ingestion import load_dataset
-from src.config import settings
+from src.ingestion import load_dataset  # noqa: E402
+from src.config import settings  # noqa: E402
 
 
 def publish_dataset(
