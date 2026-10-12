@@ -45,7 +45,19 @@ def publish_dataset(
 ) -> None:
     """Replay the dataset one row at a time over MQTT."""
 
-    df = load_dataset(path=dataset_path)
+    # Publisher must ALWAYS load from CSV, not from MQTT (avoid circular dependency)
+    # Temporarily override INGESTION_MODE to force CSV loading
+    import os
+    original_mode = os.environ.get("B2G_INGESTION_MODE")
+    os.environ["B2G_INGESTION_MODE"] = "csv"
+    try:
+        df = load_dataset(path=dataset_path)
+    finally:
+        # Restore original mode
+        if original_mode is not None:
+            os.environ["B2G_INGESTION_MODE"] = original_mode
+        else:
+            os.environ.pop("B2G_INGESTION_MODE", None)
     print(f"Loaded {len(df)} rows, publishing to {topic} at {host}:{port}")
     print(f"Interval: {interval}s per row ({1/interval:.1f} rows/sec)")
 
