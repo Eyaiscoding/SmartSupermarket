@@ -36,12 +36,19 @@ from src.api.models import (  # noqa: E402
     ScenarioRequest,
     PipelineSummary,
 )
-from src.ingestion import load_dataset  # noqa: E402
-from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator  # noqa: E402
-from src.mpc import MPCCoordinator  # noqa: E402
-from src.derms import DERMSDispatcher  # noqa: E402
-from src.compliance import ComplianceChecker  # noqa: E402
-from src.api.output import compute_coverage_status  # noqa: E402
+from src.config import settings
+from src.ingestion import load_dataset
+from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator
+from src.mpc import MPCCoordinator
+from src.mpc.coordinator import COVERAGE_AT_RISK
+from src.derms import DERMSDispatcher
+from src.compliance import (
+    ComplianceChecker,
+    cold_chain_temps,
+    tier_1_demand_kw,
+)
+from src.api import OutputWriter, OutputRecord
+from src.api.output import compute_coverage_status
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +217,17 @@ def _run_pipeline_sync(
         )
         battery_soc = dispatch.battery_soc_after
 
-        tier_1_ok = checker.check_step(action)
+        supply = float(row["pv_power"]) + max(dispatch.battery_power, 0.0)
+        supply += max(dispatch.grid_power, 0.0)
+        tier_1_ok = checker.check_step(
+            action,
+            timestamp=str(row["timestamp"]),
+            tier_1_demand_kw=tier_1_demand_kw(row),
+            supply_kw=supply,
+            battery_soc=battery_soc,
+            battery_power_kw=dispatch.battery_power,
+            cold_temps=cold_chain_temps(row),
+        )
 
         supply = float(row["pv_power"]) + max(dispatch.battery_power, 0.0)
         supply += max(dispatch.grid_power, 0.0)

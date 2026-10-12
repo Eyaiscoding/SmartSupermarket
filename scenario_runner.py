@@ -21,6 +21,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -32,13 +33,18 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.ingestion import load_dataset  # noqa: E402
-from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator  # noqa: E402
-from src.mpc import MPCCoordinator  # noqa: E402
-from src.derms import DERMSDispatcher  # noqa: E402
-from src.compliance import ComplianceChecker  # noqa: E402
-from src.api import OutputWriter, OutputRecord  # noqa: E402
-from src.api.output import compute_coverage_status  # noqa: E402
+from src.ingestion import load_dataset
+from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator
+from src.mpc import MPCCoordinator
+from src.mpc.coordinator import COVERAGE_AT_RISK
+from src.derms import DERMSDispatcher
+from src.compliance import (
+    ComplianceChecker,
+    cold_chain_temps,
+    tier_1_demand_kw,
+)
+from src.api import OutputWriter, OutputRecord
+from src.api.output import compute_coverage_status
 
 
 # -- Stress-scenario injection ------------------------------------------------
@@ -185,11 +191,19 @@ def run_pipeline(
         battery_soc = dispatch.battery_soc_after
 
         # Compliance.
-        tier_1_ok = checker.check_step(action)
-
-        # Coverage ratio.
         supply = float(row["pv_power"]) + max(dispatch.battery_power, 0.0)
         supply += max(dispatch.grid_power, 0.0)
+        tier_1_ok = checker.check_step(
+            action,
+            timestamp=str(row["timestamp"]),
+            tier_1_demand_kw=tier_1_demand_kw(row),
+            supply_kw=supply,
+            battery_soc=battery_soc,
+            battery_power_kw=dispatch.battery_power,
+            cold_temps=cold_chain_temps(row),
+        )
+
+        # Coverage ratio.
         total_c = float(row["total_consumption"])
         coverage = supply / total_c if total_c > 0 else 1.0
         coverage = min(coverage, 1.0)
@@ -226,6 +240,14 @@ def run_pipeline(
     csv_path = output_dir / f"output_{label}.csv"
     writer.to_json(json_path)
     writer.to_csv(csv_path)
+
+    # Full compliance report (violation log, counters, regulatory references).
+    compliance_path = output_dir / f"compliance_{label}.json"
+    compliance_path.write_text(
+        json.dumps(report.to_dict(), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
     summary = writer.summary()
     elapsed = time.time() - t0
 
@@ -234,6 +256,12 @@ def run_pipeline(
     print(f"  Timesteps processed:       {report.total_timesteps}")
     print(f"  Tier 1 breaches:           {report.tier_1_breaches}")
     print(f"  Tier 1 always protected:   {report.tier_1_protected}")
+    print(f"  Compliance status:         {report.overall_status} "
+          f"(G/Y/R steps: {report.green_steps}/{report.yellow_steps}/{report.red_steps})")
+    print(f"  Cascade-order warnings:    {report.cascade_order_warnings}")
+    print(f"  Battery-limit warnings:    {report.battery_limit_warnings}")
+    print(f"  Cold-chain breaches:       {report.cold_chain_breaches} "
+          f"(monitored: {report.cold_chain_monitored})")
     print(f"  Peak-shave events:         {report.peak_shave_count}")
     print(f"  Valley-fill events:        {report.valley_fill_count}")
     print(f"  Load-shift (HVAC) events:  {report.load_shift_count}")
@@ -249,6 +277,7 @@ def run_pipeline(
     print(f"  Elapsed time:              {elapsed:.1f}s")
     print(f"  Output files:              {json_path}")
     print(f"                             {csv_path}")
+    print(f"                             {compliance_path}")
 
     return {
         "label": label,
