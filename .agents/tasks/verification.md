@@ -43,9 +43,10 @@
 
 ### Linting
 - Fixed missing `os` import in `src/ingestion/loader.py`
-- Ran `ruff check src/ tests/ scenario_runner.py --select E,F,W --ignore E501,E402 --fix`
-- **Result**: All checks passed (0 errors)
-- Committed as: `9295dbf fix: post-merge linting fixes (add os import)`
+- Added `# noqa: E402` comments to 21 module-level imports in `scenario_runner.py` (9 occurrences) and `src/api/fastapi_app.py` (12 occurrences) that legitimately follow `sys.path.insert()` for project root injection
+- Ran `ruff check src/ tests/ scenario_runner.py --select E,F,W --ignore E501 --fix`
+- **Result**: All checks passed (0 errors) with proper E402 suppression via inline comments
+- Committed as: `9295dbf fix: post-merge linting fixes (add os import)` (initial), followed by review fixes for E402
 
 ## Test Results
 
@@ -76,10 +77,11 @@ All expected files from the three branches are present:
 - ✅ `src/p2p/pipeline.py`
 - ✅ `src/p2p/pricing.py`
 
-### Database Migrations (3 files)
+### Database Migrations (3 files + README)
 - ✅ `src/persistence/migrations/003_p2p.sql`
 - ✅ `src/persistence/migrations/004_temperature.sql`
-- ✅ `src/persistence/migrations/005_dashboard.sql`
+- ✅ `src/persistence/migrations/005_dashboard.sql` (includes dependency documentation header)
+- ✅ `src/persistence/migrations/README.md` (documents required execution order: 001→002→003→004→005)
 
 ### Dashboard (37 files)
 - ✅ `dashboard/package.json`

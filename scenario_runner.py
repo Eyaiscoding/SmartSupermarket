@@ -33,19 +33,19 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.ingestion import load_dataset
-from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator
-from src.mpc import MPCCoordinator
-from src.derms import DERMSDispatcher
-from src.compliance import (
+from src.ingestion import load_dataset  # noqa: E402
+from src.forecasting import Forecaster, AnomalyDetector, FlexibilityEstimator  # noqa: E402
+from src.mpc import MPCCoordinator  # noqa: E402
+from src.derms import DERMSDispatcher  # noqa: E402
+from src.compliance import (  # noqa: E402
     ComplianceChecker,
     cold_chain_temps,
     tier_1_demand_kw,
 )
-from src.api import OutputWriter, OutputRecord
-from src.api.output import compute_coverage_status
-from src.p2p.pipeline import NeighborMarket
-from src.monitoring.temperature import TemperatureMonitor
+from src.api import OutputWriter, OutputRecord  # noqa: E402
+from src.api.output import compute_coverage_status  # noqa: E402
+from src.p2p.pipeline import NeighborMarket  # noqa: E402
+from src.monitoring.temperature import TemperatureMonitor  # noqa: E402
 
 
 # -- Stress-scenario injection ------------------------------------------------
