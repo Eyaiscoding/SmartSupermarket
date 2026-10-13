@@ -143,9 +143,3 @@ ruff check .
 
 - **`ARCHITECTURE_TECHNIQUE.md`** : Description détaillée de l'architecture, technologies et fonctionnement
 - **`GUIDE_PRESENTATION.md`** : Guide de présentation pour expliquer l'interface utilisateur et les scénarios
-
----
-
-## 👥 Équipe
-
-Ce dépôt couvre le **moteur de simulation backend uniquement**. Le dashboard et les couches de reporting de conformité sont développés séparément par d'autres membres de l'équipe et consomment le contrat de sortie de ce module (fichiers JSON/CSV et API REST/WebSocket).
