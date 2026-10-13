@@ -183,5 +183,21 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # -- Compliance Microservice -------------------------------------------------
+  compliance:
+    build:
+      context: .
+      dockerfile: services/compliance/Dockerfile
+    container_name: b2g-compliance
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      derms:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   timescale_data:
