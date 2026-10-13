@@ -167,5 +167,21 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # -- DERMS Microservice ------------------------------------------------------
+  derms:
+    build:
+      context: .
+      dockerfile: services/derms/Dockerfile
+    container_name: b2g-derms
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mpc:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   timescale_data:

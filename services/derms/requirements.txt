@@ -1,0 +1,4 @@
+pandas>=2.0
+numpy>=1.24
+kafka-python>=2.0.2
+lz4>=4.3.2
