@@ -14,74 +14,62 @@ export function mockRecord(timestamp: number, scenario: Scenario = 'none'): Time
   const evening = Math.exp(-(((hour - 19) / 2.2) ** 2)) * 22;
   let demand = 20 + (hour > 7 && hour < 22 ? 17 : 0) + evening + Math.sin(step * 1.7) * 2;
   
-  // SCENARIO: FORCED GRID OUTAGE - Multiple full-day outages
-  const outage = scenario === 'forced_grid_outage' && 
-    (dayOfPeriod % 15 === 5 || dayOfPeriod % 15 === 10) && // Two outages every 15 days
-    hour >= 10 && hour < 22; // 12 hours outage
+  // ========== SCENARIO VARIATIONS - VERY VISIBLE ==========
   
-  // SCENARIO: PRICE SPIKE - Extreme prices during evening peaks
-  let price = 0.18; // Base price
-  const priceSpike = scenario === 'price_spike' && hour >= 18 && hour < 21; // Every evening
-  if (priceSpike) {
-    price = 1.20; // 7x normal price
-  } else if (hour < 6) {
-    price = 0.10; // Cheap at night
-  }
-  
-  // SCENARIO: SENSOR CORRUPTION - Erratic readings
-  const sensorFailure = scenario === 'sensor_corruption' && 
-    (dayOfPeriod % 10 === 3 || dayOfPeriod % 10 === 7) && // Two failures every 10 days
-    hour >= 12 && hour < 18; // Afternoon failures
-  
-  if (sensorFailure) {
-    demand *= 1.8; // Demand sensor reads high
-  }
-  
-  // Calculate system state based on scenario
   let batterySoc: number;
   let gridPower: number;
   let coverageRatio: number;
   let activeActions: string[];
   let tier1Protected = true;
+  let price = 0.18;
+  let anomalyFlag = false;
+  let anomalySource: string | null = null;
   
-  if (outage) {
-    // GRID OUTAGE: Must survive on battery + solar only
-    const available = solar + Math.max(0, 70 - (hour - 10) * 5); // Battery draining
-    batterySoc = Math.max(5, 90 - (hour - 10) * 7); // Rapid discharge
-    gridPower = 0;
-    coverageRatio = Math.min(0.95, available / demand);
+  if (scenario === 'forced_grid_outage') {
+    // GRID OUTAGE: Grid is ZERO, battery drains, coverage drops
+    batterySoc = Math.max(5, 90 - step * 0.3); // Rapid drain
+    gridPower = 0; // NO GRID
+    coverageRatio = Math.max(0.65, 0.95 - step * 0.005); // Deteriorating
     activeActions = batterySoc < 30 ? ['hard_shedding'] : ['peak_shaving', 'hvac_soft_shed'];
-    tier1Protected = batterySoc > 15; // Risk if battery too low
-  } else if (priceSpike) {
-    // PRICE SPIKE: Avoid grid, use battery aggressively
-    batterySoc = Math.max(20, 85 - (hour - 18) * 15); // Discharge during spike
-    const batteryContribution = Math.min(40, demand - solar);
-    gridPower = Math.max(0, demand - solar - batteryContribution) * GRID_IMPORT_SIGN;
-    coverageRatio = 0.97;
-    activeActions = ['peak_shaving', 'hvac_soft_shed']; // Reduce demand
-    tier1Protected = true;
-  } else if (sensorFailure) {
-    // SENSOR CORRUPTION: System confused by bad readings
-    batterySoc = 45 + Math.sin(step * 3.7) * 30; // Erratic behavior
-    gridPower = (demand - solar) * GRID_IMPORT_SIGN * 1.3; // Over-importing
-    coverageRatio = 0.92 + Math.random() * 0.06; // Unstable
-    activeActions = ['peak_shaving']; // Wrong decisions
-    tier1Protected = true;
+    tier1Protected = batterySoc > 15;
+    price = 0.0; // No price during outage
+    
+  } else if (scenario === 'price_spike') {
+    // PRICE SPIKE: High price, aggressive battery use, reduced grid
+    const inPeakHour = hour >= 18 && hour < 21;
+    price = inPeakHour ? 1.20 : 0.18; // 7x price during peak
+    batterySoc = inPeakHour 
+      ? Math.max(20, 85 - (hour - 18) * 20) // Discharge fast during peak
+      : Math.min(90, 50 + hour * 2); // Charge otherwise
+    gridPower = inPeakHour
+      ? Math.max(5, (demand - solar) * 0.3) * GRID_IMPORT_SIGN // Minimal grid use
+      : (demand - solar) * GRID_IMPORT_SIGN;
+    coverageRatio = 0.96;
+    activeActions = inPeakHour ? ['peak_shaving', 'hvac_soft_shed'] : hour < 6 ? ['valley_filling'] : [];
+    
+  } else if (scenario === 'sensor_corruption') {
+    // SENSOR CORRUPTION: Erratic readings, high demand, unstable
+    demand *= 1.8; // Sensor reads HIGH
+    batterySoc = 30 + Math.sin(step * 0.5) * 25; // Erratic (5-55%)
+    gridPower = (demand - solar) * 1.5 * GRID_IMPORT_SIGN; // Over-importing due to bad readings
+    coverageRatio = 0.88 + Math.sin(step * 0.7) * 0.08; // Unstable (80-96%)
+    activeActions = ['peak_shaving'];
+    anomalyFlag = true;
+    anomalySource = 'Capteur de consommation défaillant - lecture +80%';
+    
   } else {
-    // NORMAL: Optimal operation
+    // NORMAL: Smooth, optimal operation
     batterySoc = Math.max(15, Math.min(95, 52 + 34 * Math.sin(((hour - 8) / 24) * 2 * Math.PI)));
     gridPower = (demand - solar) * GRID_IMPORT_SIGN;
     coverageRatio = 0.98 + Math.sin(step) * 0.014;
     activeActions = hour < 5 ? ['valley_filling'] : evening > 12 ? ['peak_shaving'] : [];
-    tier1Protected = true;
+    anomalyFlag = step % 53 === 12;
+    anomalySource = anomalyFlag ? 'Écart inhabituel entre prévision et mesure' : null;
   }
   
   // Coverage status
   const critical = coverageRatio < 0.90 || !tier1Protected;
   const risk = coverageRatio >= 0.90 && coverageRatio < 0.95;
-  
-  // Anomaly detection
-  const anomaly = sensorFailure || (scenario === 'none' && step % 53 === 12);
   
   return adaptRecord({
     timestamp: new Date(timestamp).toISOString(),
@@ -92,12 +80,8 @@ export function mockRecord(timestamp: number, scenario: Scenario = 'none'): Time
     battery_soc: Math.round(batterySoc * 100) / 100,
     grid_power: Math.round(gridPower * 100) / 100,
     p2p_energy: solar > 45 ? -4 : hour > 18 && hour < 21 ? 3 : 0,
-    anomaly_flag: anomaly,
-    anomaly_source: anomaly
-      ? scenario === 'sensor_corruption'
-        ? 'Capteur de consommation défaillant - lecture +80%'
-        : 'Écart inhabituel entre prévision et mesure'
-      : null,
+    anomaly_flag: anomalyFlag,
+    anomaly_source: anomalySource,
     energy_price: price,
     demand_kw: Math.round(demand * 100) / 100,
     pv_power: Math.round(solar * 100) / 100,

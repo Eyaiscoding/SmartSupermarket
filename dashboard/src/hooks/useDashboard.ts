@@ -20,6 +20,18 @@ export function useDashboard() {
   });
   const mock = api.FORCE_MOCK || availability.isError;
   const online = !api.FORCE_MOCK && availability.isSuccess && !availability.isError;
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('[Dashboard] FORCE_MOCK:', api.FORCE_MOCK);
+    console.log('[Dashboard] availability.isError:', availability.isError);
+    console.log('[Dashboard] availability.isSuccess:', availability.isSuccess);
+    console.log('[Dashboard] mock:', mock);
+    console.log('[Dashboard] online:', online);
+    if (availability.error) {
+      console.error('[Dashboard] Health check error:', availability.error);
+    }
+  }, [mock, online, availability.isError, availability.isSuccess, availability.error]);
   const onComplete = useCallback(() => {
     void client.invalidateQueries({ queryKey: ['history'] });
     void client.invalidateQueries({ queryKey: ['latest'] });

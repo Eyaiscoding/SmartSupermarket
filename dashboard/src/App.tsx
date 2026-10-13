@@ -7,6 +7,7 @@ import { StatusCards } from './components/StatusCards';
 import { Finance } from './components/Finance';
 import { Charts } from './components/Charts';
 import { Operations } from './components/Operations';
+import { ScenarioComparison } from './components/ScenarioComparison';
 const connectionLabels = {
   live: 'En direct',
   reconnecting: 'Reconnexion',
@@ -231,6 +232,7 @@ export default function App() {
           </div>
         ) : last ? (
           <>
+            <ScenarioComparison records={data.records} scenario={data.scenario} />
             <StatusCards record={last} />
             <Finance records={data.records} />
             <Charts records={data.records} />

@@ -1,8 +1,13 @@
 import { adaptHistory, adaptRecord } from './adapter';
 import type { Scenario } from './types';
 export const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-export const FORCE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
+export const FORCE_MOCK = false; // Force real backend connection
 export const SCENARIO_TRANSPORT = import.meta.env.VITE_SCENARIO_TRANSPORT || 'websocket';
+
+// Debug logging
+console.log('[API Config] API_URL:', API_URL);
+console.log('[API Config] FORCE_MOCK:', FORCE_MOCK);
+console.log('[API Config] VITE_USE_MOCK env:', import.meta.env.VITE_USE_MOCK);
 export function streamUrl() {
   const url = new URL(`${API_URL}/ws/stream`);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
