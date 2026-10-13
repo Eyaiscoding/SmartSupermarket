@@ -28,7 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from kafka import KafkaConsumer
-from kafka_utils.utils import create_kafka_producer, create_kafka_consumer
+from kafka_utils.utils import create_producer, create_consumer
 from src.compliance.checker import ComplianceChecker, ComplianceStatus
 from src.mpc.coordinator import MPCAction
 import json
@@ -65,20 +65,20 @@ class ComplianceService:
         self.group_id = group_id
         
         # Create consumers for both topics
-        self.dispatch_consumer = create_kafka_consumer(
+        self.dispatch_consumer = create_consumer(
             topics=['derms.dispatch'],
             group_id=f'{group_id}-dispatch',
             bootstrap_servers=self.bootstrap_servers
         )
         
-        self.telemetry_consumer = create_kafka_consumer(
+        self.telemetry_consumer = create_consumer(
             topics=['telemetry.raw'],
             group_id=f'{group_id}-telemetry',
             bootstrap_servers=self.bootstrap_servers
         )
         
         # Create producer for compliance reports
-        self.producer = create_kafka_producer(
+        self.producer = create_producer(
             bootstrap_servers=self.bootstrap_servers
         )
         
