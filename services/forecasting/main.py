@@ -227,11 +227,14 @@ class ForecastingService(MessageProcessor):
             temperature=temperature,
         )
         
+        # Extract budgets from list by group name
+        budgets_dict = {b.group: b for b in budgets}
+        
         return {
-            'hvac_soft_shed_kw': budgets.hvac_soft_shed_kw,
-            'lighting_shed_kw': budgets.lighting_shed_kw,
-            'checkout_shed_kw': budgets.checkout_shed_kw,
-            'other_shed_kw': budgets.other_shed_kw,
+            'hvac_soft_shed_kw': budgets_dict.get('hvac', type('obj', (), {'max_reduction_kw': 0})).max_reduction_kw,
+            'lighting_shed_kw': budgets_dict.get('lighting', type('obj', (), {'max_reduction_kw': 0})).max_reduction_kw,
+            'checkout_shed_kw': budgets_dict.get('checkout', type('obj', (), {'max_reduction_kw': 0})).max_reduction_kw,
+            'other_shed_kw': budgets_dict.get('other_appliance', type('obj', (), {'max_reduction_kw': 0})).max_reduction_kw,
         }
 
 
