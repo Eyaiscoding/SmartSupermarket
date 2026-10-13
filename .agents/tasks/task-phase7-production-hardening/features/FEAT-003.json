@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-003",
+  "type": "docs",
+  "description": "Production deployment infrastructure: Add healthcheck stanzas to all microservice containers in docker-compose.yml using the /health endpoints from FEAT-002, create comprehensive PRODUCTION_DEPLOYMENT.md with deployment checklist, environment variable reference, failure modes and recovery procedures, and scaling notes.",
+  "status": "pending",
+  "steps": [
+    "In docker-compose.yml, add healthcheck stanza to forecasting service: test=['CMD', 'curl', '-f', 'http://localhost:8081/health'], interval=30s, timeout=10s, retries=3, start_period=60s. Expose port 8081 for health checks.",
+    "In docker-compose.yml, add healthcheck stanza to mpc service: test=['CMD', 'curl', '-f', 'http://localhost:8082/health'], interval=30s, timeout=10s, retries=3, start_period=60s. Expose port 8082.",
+    "In docker-compose.yml, add healthcheck stanza to derms service: test=['CMD', 'curl', '-f', 'http://localhost:8083/health'], interval=30s, timeout=10s, retries=3, start_period=60s. Expose port 8083.",
+    "In docker-compose.yml, add healthcheck stanza to compliance service: test=['CMD', 'curl', '-f', 'http://localhost:8084/health'], interval=30s, timeout=10s, retries=3, start_period=60s. Expose port 8084.",
+    "Create PRODUCTION_DEPLOYMENT.md with sections: (1) Deployment Checklist — pre-flight steps (verify .env vars, run tests, build images, create Kafka topics, check disk space), deployment steps (docker compose up -d, verify healthchecks, smoke test /health endpoints, tail logs), post-deployment validation (end-to-end scenario test, check compliance reports). (2) Environment Variable Reference — table of all env vars from .env.example with descriptions, defaults, and whether required/optional. (3) Failure Modes and Recovery — common failure scenarios (Kafka broker down, TimescaleDB connection lost, service OOM, DLQ overflow) with detection methods (logs, healthcheck failures, container restarts) and recovery procedures (restart service, clear DLQ, scale up resources). (4) Scaling Notes — how to scale each service (Kafka partition count, consumer group instances, container replicas), when to scale (CPU/memory thresholds, message lag), and bottlenecks to watch (Kafka throughput, TimescaleDB write capacity, Redis memory).",
+    "Update README.md Production Deployment section to reference PRODUCTION_DEPLOYMENT.md for detailed procedures."
+  ],
+  "acceptance_criteria": [
+    "docker-compose.yml has healthcheck stanzas for all 4 microservices with correct endpoints and timing parameters",
+    "docker compose ps shows all services healthy after startup (no container marked unhealthy)",
+    "PRODUCTION_DEPLOYMENT.md covers deployment checklist, env var reference, failure recovery, and scaling guidance",
+    "README.md links to PRODUCTION_DEPLOYMENT.md"
+  ],
+  "verification": [
+    "docker compose up --build -d && sleep 90",
+    "docker compose ps | grep -v 'healthy' | wc -l | grep 1",
+    "cat PRODUCTION_DEPLOYMENT.md | grep -E 'Deployment Checklist|Environment Variable Reference|Failure Modes|Scaling Notes'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

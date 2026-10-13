@@ -1,0 +1,7 @@
+{
+  "task_id": "task-phase7-production-hardening",
+  "task_description": "Production-harden the B2G microservices platform: add retry/circuit breaker/DLQ to kafka_utils, add health endpoints and schema validation to all 4 services, sanitize logs, add docker healthchecks, create deployment docs",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

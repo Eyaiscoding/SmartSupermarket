@@ -1,0 +1,29 @@
+{
+  "project_type": "Python 3.13 microservices with Apache Kafka event streaming, FastAPI backend, Docker Compose orchestration",
+  "language": "Python 3.13",
+  "build_system": "pip with requirements.txt per service (no build step — interpreted Python)",
+  "test_framework": "pytest 7.4+ with pytest-asyncio for async tests",
+  "build_command": "N/A (interpreted Python — services run directly with python -m <service>)",
+  "test_command": "python -m pytest tests/ -v",
+  "verification_instructions": "Run pytest for each changed module. For kafka_utils changes: pytest kafka_utils/test_kafka.py -v. For service changes: pytest tests/test_<service>.py -v. For integration: docker compose up --build -d && docker compose ps to verify all containers healthy.",
+  "snapshot_or_generated_files": null,
+  "environment_constraints": "Never restart kafka/zookeeper manually — docker compose manages lifecycle. Services consume env vars from docker-compose.yml environment blocks. Local dev uses localhost:9093 for Kafka, docker services use kafka:9092.",
+  "contribution_requirements": "Tests must pass (pytest tests/ -v). Services must be stateless and idempotent. All Kafka topics must follow naming: <service>.<entity> (e.g., telemetry.raw, mpc.decisions). Log at INFO level for operational events, DEBUG for verbose details, ERROR for failures.",
+  "key_patterns": "MessageProcessor base class in kafka_utils/utils.py for all consumer services. Services inherit from MessageProcessor, override process_message(), and call run() in main(). Services use signal handlers for graceful shutdown. All services log with Python logging module and standard format '%(asctime)s - %(name)s - %(levelname)s - %(message)s'. Tests use pytest fixtures and follow pattern: load data, instantiate class, assert expectations.",
+  "relevant_files": [
+    "kafka_utils/utils.py",
+    "services/forecasting/main.py",
+    "services/mpc/main.py",
+    "services/derms/main.py",
+    "services/compliance/main.py",
+    ".env.example",
+    "docker-compose.yml",
+    "tests/test_forecasting.py",
+    "tests/test_mpc.py",
+    "tests/test_derms.py",
+    "tests/test_compliance.py",
+    "requirements.txt",
+    "services/forecasting/requirements.txt"
+  ],
+  "directory_structure": "kafka_utils/ = shared Kafka client utilities. services/<name>/ = microservice entrypoints with main.py and Dockerfile. src/ = core business logic modules (forecasting, mpc, derms, compliance). tests/ = pytest test suite. data/ = dataset.csv for training. docker/ = docker config files. .agents/ = workflow artifacts."
+}

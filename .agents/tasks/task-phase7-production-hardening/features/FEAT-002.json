@@ -1,0 +1,39 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Harden all 4 microservices (forecasting, mpc, derms, compliance): Add /health and /ready HTTP endpoints using lightweight threading.Thread HTTP server (no extra deps), validate incoming message schemas with required field checks and type validation (reject invalid messages to DLQ), sanitize logs to never log passwords/tokens/secrets, switch to structured JSON logging with service_name and correlation_id, wrap consumer loops with retry + circuit breaker logic from FEAT-001, add startup config validation that fails fast if required env vars missing.",
+  "status": "pending",
+  "steps": [
+    "Create shared HealthServer class in kafka_utils/utils.py that runs http.server.HTTPServer in a background thread with /health (always 200 OK) and /ready (checks Kafka connectivity using check_kafka_health()) endpoints. Add port parameter (default 8080). Start server in __init__, provide stop() method for cleanup.",
+    "In services/forecasting/main.py: import and call configure_json_logging('forecasting') at start of main(). Start HealthServer(port=8081) before entering run() loop. Validate required env vars (KAFKA_BOOTSTRAP_SERVERS, TRAINING_DATA_PATH) and fail fast with clear error if missing. Add schema validation in process_message(): check telemetry dict has required keys (timestamp, total_consumption, pv_power, temperature) and correct types (str, float, float, float). Raise ValueError on invalid schema to trigger DLQ routing. Wrap self.run() with try/except to log any secrets-looking strings (regex patterns for 'password', 'token', 'key=', 'secret') and redact them as '***REDACTED***'.",
+    "In services/mpc/main.py: import and call configure_json_logging('mpc') at start of main(). Start HealthServer(port=8082). Validate required env vars (KAFKA_BOOTSTRAP_SERVERS, MPC_HORIZON_HOURS, MPC_TIME_STEP_MINUTES) with sensible defaults and log warnings if using defaults. Add schema validation in process_message(): check prediction dict has required keys (timestamp, forecast_consumption, forecast_pv, flexibility_budgets) and correct types. Sanitize logs by scanning for common secret patterns and redacting.",
+    "In services/derms/main.py: import and call configure_json_logging('derms') at start of main(). Start HealthServer(port=8083). Validate KAFKA_BOOTSTRAP_SERVERS env var. Add schema validation in process_message(): check decision dict has required keys (timestamp, peak_shave, peak_shave_kw, load_shift_hvac, hvac_shed_kw, valley_fill, valley_fill_kw, hard_shed_tiers, hard_shed_kw, active_action_names) and correct types. Sanitize logs.",
+    "In services/compliance/main.py: import and call configure_json_logging('compliance') at start of main(). Start HealthServer(port=8084). Validate KAFKA_BOOTSTRAP_SERVERS env var. Add schema validation in process_dispatch(): check dispatch dict has required keys (timestamp, commands, battery_power, grid_power, battery_soc_after) and correct types. Add schema validation in process_telemetry(): check telemetry dict has required keys (timestamp, building_id). Sanitize logs.",
+    "Update .env.example with all newly required env vars: KAFKA_BOOTSTRAP_SERVERS, MPC_HORIZON_HOURS, MPC_TIME_STEP_MINUTES, TRAINING_DATA_PATH. Add comments explaining each variable.",
+    "Add unit tests in tests/test_forecasting.py, tests/test_mpc.py, tests/test_derms.py, tests/test_compliance.py that verify schema validation rejects invalid messages."
+  ],
+  "acceptance_criteria": [
+    "All 4 services expose /health endpoint that returns 200 OK",
+    "All 4 services expose /ready endpoint that returns 200 if Kafka reachable, 503 otherwise",
+    "All 4 services validate incoming message schemas and raise ValueError on missing/invalid fields",
+    "All 4 services log in structured JSON format with service_name and correlation_id fields",
+    "All 4 services sanitize logs to redact passwords, tokens, and secrets",
+    "All 4 services validate required env vars at startup and fail fast with clear error messages",
+    ".env.example documents all required env vars with comments"
+  ],
+  "verification": [
+    "docker compose up --build -d && sleep 10",
+    "curl http://localhost:8081/health | grep 200",
+    "curl http://localhost:8082/health | grep 200",
+    "curl http://localhost:8083/health | grep 200",
+    "curl http://localhost:8084/health | grep 200",
+    "curl http://localhost:8081/ready | grep 200",
+    "docker compose logs forecasting --tail 20 | python -m json.tool",
+    "python -m pytest tests/test_forecasting.py -v -k schema",
+    "python -m pytest tests/test_mpc.py -v -k schema",
+    "python -m pytest tests/test_derms.py -v -k schema",
+    "python -m pytest tests/test_compliance.py -v -k schema"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

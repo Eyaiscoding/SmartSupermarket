@@ -66,13 +66,13 @@ class ComplianceService:
         
         # Create consumers for both topics
         self.dispatch_consumer = create_consumer(
-            topics=['derms.dispatch'],
+            'derms.dispatch',
             group_id=f'{group_id}-dispatch',
             bootstrap_servers=self.bootstrap_servers
         )
         
         self.telemetry_consumer = create_consumer(
-            topics=['telemetry.raw'],
+            'telemetry.raw',
             group_id=f'{group_id}-telemetry',
             bootstrap_servers=self.bootstrap_servers
         )

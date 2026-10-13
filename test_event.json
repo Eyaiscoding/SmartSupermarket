@@ -1,0 +1,1 @@
+{"timestamp": "2026-10-13T14:00:00Z", "building_id": "supermarket_001", "energy_consumption_kw": 180.0, "pv_generation_kw": 60.0, "battery_soc_percent": 55.0, "grid_price_eur_per_kwh": 0.42, "outdoor_temp_c": 28.0, "indoor_temp_c": 23.5, "hvac_power_kw": 45.0, "lighting_power_kw": 27.0, "refrigeration_power_kw": 72.0, "checkout_power_kw": 18.0}

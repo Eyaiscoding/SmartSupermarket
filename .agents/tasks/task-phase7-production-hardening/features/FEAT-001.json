@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Production-grade kafka_utils: Add retry decorator with exponential backoff, circuit breaker for Kafka connection failures, dead-letter queue (DLQ) support routing failed messages to .dlq topic suffix, correlation ID injection for all logs, and JSON structured logging formatter. These are foundational utilities that all 4 microservices will use.",
+  "status": "pending",
+  "steps": [
+    "Add retry_with_backoff() decorator in kafka_utils/utils.py with configurable max_retries (default 3), base_delay_seconds (default 1.0), max_delay_seconds (default 60.0), and exponential_base (default 2). Decorator should catch exceptions, log retry attempts with correlation_id, sleep with exponential backoff, and re-raise after max retries exhausted.",
+    "Add CircuitBreaker class in kafka_utils/utils.py with states (CLOSED, OPEN, HALF_OPEN), failure_threshold (default 5), success_threshold (default 2), timeout_seconds (default 60). On OPEN state, fail fast without calling wrapped function. On HALF_OPEN, allow one test call. Track failure/success counts and state transitions with logging.",
+    "Add DLQ support to MessageProcessor.run() in kafka_utils/utils.py: when process_message() raises exception, serialize failed message to JSON and send to {original_topic}.dlq topic (e.g., telemetry.raw.dlq). Log DLQ routing with correlation_id. Add config flag enable_dlq (default True).",
+    "Add get_correlation_id() function in kafka_utils/utils.py that generates UUID4-based correlation IDs. Modify MessageProcessor to inject correlation_id into every log record using logging.Filter. Store correlation_id in thread-local storage or message metadata.",
+    "Add JSONFormatter class in kafka_utils/utils.py (subclass of logging.Formatter) that outputs structured JSON logs with fields: timestamp (ISO8601), level, logger_name, message, service_name, correlation_id, and extra fields from LogRecord.extra. Add configure_json_logging(service_name) helper function.",
+    "Update requirements.txt to add any new dependencies if needed (likely none — standard library sufficient for retry/circuit breaker/JSON logging)."
+  ],
+  "acceptance_criteria": [
+    "retry_with_backoff decorator can wrap any function and retries on exception with exponential backoff up to max_retries",
+    "CircuitBreaker transitions between CLOSED/OPEN/HALF_OPEN states based on failure/success thresholds",
+    "MessageProcessor routes failed messages to .dlq topic when process_message() raises exception",
+    "All log messages from MessageProcessor include correlation_id field",
+    "configure_json_logging() produces valid JSON log lines with required fields (timestamp, level, message, service_name, correlation_id)"
+  ],
+  "verification": [
+    "python -m pytest kafka_utils/test_kafka.py -v -k retry",
+    "python -m pytest kafka_utils/test_kafka.py -v -k circuit",
+    "python -m pytest kafka_utils/test_kafka.py -v -k dlq",
+    "python -m pytest kafka_utils/test_kafka.py -v"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
